@@ -1,0 +1,27 @@
+[webConfig]
+    port= 30000
+
+[zmq]
+	ctpSubAddr="tcp://127.0.0.1:20001"
+	ctpReqAddr="tcp://127.0.0.1:30001"
+	mt5USDCNHReqAddr="tcp://127.0.0.1:30003"
+	mt5XAUUSDReqAddr="tcp://127.0.0.1:30002"
+    topic="makret"
+
+[notifyConfig]
+    url=""                  # 企业微信机器人地址
+    successAudio="C:\\Windows\\Media\\Alarm01.wav"         # 成功铃音地址
+    failAudio = "C:\\Windows\\Media\\Alarm01.wav"          # 失败铃音地址
+    mentioned_list=""       # 企业微信@人
+
+[db]
+    host="rm-bp1l09swp665a10naro.mysql.rds.aliyuncs.com"
+    user="test_quant"
+    pwd="ASDzxc!%40#"  # 实际为ASDzxc!@#
+    charset="utf8"
+	db="quant"
+	table="parent"
+	
+
+	
+
