@@ -25,7 +25,4 @@ if __name__ == '__main__':
     s.init_api()
     s.runApi()
     app = app.create_app(s)
-    try:
-        app.run(host=s.webConfig["host"], port=s.webConfig["port"], debug=False)
-    except KeyboardInterrupt:
-        print("程序已被 Ctrl+C 中断")
+    app.run(host=s.webConfig["host"], port=s.webConfig["port"], debug=False)

@@ -36,7 +36,7 @@ class Notify(object):
                    "mentioned_mobile_list": self._mentioned_list
                }}  # 发送文本消息27     # 发送请求
 
-        requests.post(self._url, headers=headers, json=msg)
+        # requests.post(self._url, headers=headers, json=msg)
         return True
 
     def _notify_audio(self, audio_file):
@@ -79,3 +79,17 @@ class Notify(object):
         self._notify_audio(self._failAudio)
         # 弹出阻塞式消息框
         ctypes.windll.user32.MessageBoxW(0, notify_msg, "警告", 0x40 | 0x1)
+
+    def notify_add_orders_fail(self,msg):
+        notify_msg = f"{msg}\n 补单失败， 尽快手动处理！！！！！"
+        self._send_wechat(notify_msg)
+        self._notify_audio(self._failAudio)
+        # 弹出阻塞式消息框
+        ctypes.windll.user32.MessageBoxW(0, notify_msg, "警告", 0x40 | 0x1)
+
+    def send_trade_result(self,startSpread,rangeSpread,spread,action,openclose,positions):
+        notify_msg=(f"trade success:\n "
+                    f"startSpread: {startSpread} | rangeSpread: {rangeSpread} | spread: {spread}\n"
+                    f"{action} | {openclose} | positions: {positions}")
+        self._send_wechat(notify_msg)
+        self._notify_audio(self._successAudio)

@@ -1,4 +1,12 @@
 import zmq
+import time
+import threading
+from package.logger.logger import setup_logger
+import logging
+
+# 获取已经配置好的日志记录器
+logger = logging.getLogger('root')
+
 
 class ZmqPublisher:
     """ ZeroMQ PUB 端（发布者）封装 """
@@ -18,17 +26,3 @@ class ZmqPublisher:
         """ 关闭发布端 """
         self.socket.close()
         self.context.term()
-
-if __name__ == '__main__':
-    p=ZmqPublisher("tcp://127.0.0.1:50001",topic="market")
-    from package.zmq import models
-    def publish_market(askPrice1,bidPrice1):
-        rsp = models.Response()
-        ctpmd = models.Market()
-        ctpmd.instrumentID = "au2506"
-        # bidPrice:787.68  - askPrice:787.74
-        ctpmd.bidPrice1 = bidPrice1
-        ctpmd.askPrice1 = askPrice1
-        rsp.market = ctpmd
-        json_str = rsp.to_json()
-        p.publish(json_str)

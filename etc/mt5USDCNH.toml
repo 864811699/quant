@@ -1,10 +1,10 @@
 [baseConfig]
-    path= "D:\\MT5\\ICMT5\\terminal64.exe"
-    host= "ICMarketsSC-Demo"        #mt5 服务器地址
-    user= 52280144               #mt5 账户
-    pwd= "pO7x@QvxO@j0Bv"                #密码
-    subSymbol= "USDCNH"  # mt5 交易标的
-    fillType = 1        #0 = 全成或撤  1 =成交剩余撤   2= 被动挂单(限价)    3= 成交,剩余挂单
+    path= "D:\\app\\MT5_EX\\terminal64.exe"
+    host= "Exness-MT5Trial5"        #mt5 服务器地址
+    user= 76784022               #mt5 账户
+    pwd= "Junge@789"                #密码
+    subSymbol= "USDCNH"  # 勿动顺序 ,mt5 交易标的
+    fillType = 0        #0 = 全成或撤  1 =成交剩余撤   2= 被动挂单(限价)    3= 成交,剩余挂单
 
 
 [db]

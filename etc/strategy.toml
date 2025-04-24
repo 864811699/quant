@@ -2,15 +2,16 @@
 startSpread=100
 rangeSpread=20
 stopDate = ["2025/03/20","2025/03/20"]  #以下3者配置任一生效则停止交易
-stopTime =["09:10:15","9:20:50"]
-stopDateTime=["2025/03/20 09:10:15","2025/03/20 9:20:50"]
+stopTime =["09:10:15","09:20:50"]
+stopDateTime=["2025/03/20 09:10:15","2025/03/20 09:20:50"]
+maxVol=10
 
 [op1]
-symbol = "au2504"
+symbol = "au2506"
 rate=1
 
 [op2]
-symbol = "XAUUSDm"
+symbol = "GOLD#"
 rate = 0.2              # 每一手期货需要交易几手该标的
 
 [op3]

@@ -1,12 +1,14 @@
 [webConfig]
     port= 30000
+    host="127.0.0.1"
 
 [zmq]
 	ctpSubAddr="tcp://127.0.0.1:20001"
+#    ctpSubAddr="tcp://127.0.0.1:50001"
 	ctpReqAddr="tcp://127.0.0.1:30001"
 	mt5USDCNHReqAddr="tcp://127.0.0.1:30003"
 	mt5XAUUSDReqAddr="tcp://127.0.0.1:30002"
-    topic="makret"
+    topic="market"
 
 [notifyConfig]
     url=""                  # 企业微信机器人地址

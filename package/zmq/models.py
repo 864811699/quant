@@ -42,7 +42,7 @@ class POrder:
     realOpenSpread: float = 0.0  # 实际开仓点差
     closeSpread: float = 0.0  # 预期平仓点差
     realCloseSpread: float = 0.0  # 实际平仓点差
-    status: int = 0  #-1未知  0待开仓/ 1ctp开仓 / 2伦敦金开仓/ 3汇率开仓 /5 待平仓 /6 ctp平仓 /7 伦敦金平仓/ 8 汇率平仓  /10异常 /11CTP开单失败(未成已撤)
+    status: int = 0  # 0创建/ 1ctp开仓 / 2伦敦金开仓/ 3汇率开仓 /4 ctp平仓 /5 伦敦金平仓/ 6汇率平仓
     created_at: datetime = field(default_factory=datetime.now)
     closed_at: datetime = field(default_factory=datetime.now)
     askCtpQty: int =0
@@ -106,6 +106,8 @@ class Market:
 
 
 
+
+
 REQ_POSITION = "P"
 REQ_ORDER = "O"
 REQ_MARKET = "M"
@@ -137,7 +139,6 @@ class Response:
         return json.dumps(asdict(self), default=custom_json_encoder, indent=4, ensure_ascii=False)
 
 
-# 自定义解码器，用于将字典转换为对应的类实例
 def custom_json_decoder(dct):
     # 判断字段来选择转换的类
     if 'req_success' in dct and 'errmsg' in dct:

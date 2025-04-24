@@ -1,8 +1,19 @@
 from datetime import datetime, timedelta
 
 from src.core import comm
-from src.mt5 import comm as mt5comm
 from package.zmq import models
+
+import logging
+
+from package.logger.logger import setup_logger
+
+log = logging.getLogger('root')
+
+
+
+def get_caculate_close_spread(open_spread,base_spread,range_spread):
+    # 平仓逻辑为 逼近基准点差时平仓
+    return open_spread-range_spread if open_spread>base_spread else open_spread+range_spread
 
 
 def get_caculate_spread(ctpP, mt5P, rateP, action):
@@ -19,11 +30,11 @@ def get_caculate_spread_from_price(ctpP, mt5P, rateP):
     return ctpP - mt5P / 31.1035 * rateP
 
 
-def get_caculate_close_spread(spread, longShort, closeRangeSpread):
-    if longShort == comm.ACTION_LONG:
-        return spread - closeRangeSpread
-    if longShort == comm.ACTION_SHORT:
-        return spread + closeRangeSpread
+# def get_caculate_close_spread(spread, longShort, closeRangeSpread):
+#     if longShort == comm.ACTION_LONG:
+#         return spread - closeRangeSpread
+#     if longShort == comm.ACTION_SHORT:
+#         return spread + closeRangeSpread
 
 
 def is_open_long(ctpP, mt5P, rateP, base, range):
@@ -32,7 +43,7 @@ def is_open_long(ctpP, mt5P, rateP, base, range):
     vol = int((base - spread) / range)
     if vol >= 1:
         return True, vol, spread
-    return False, 0, 0
+    return False, 0, spread
 
 
 def is_open_short(ctpP, mt5P, rateP, base, range):
@@ -41,18 +52,18 @@ def is_open_short(ctpP, mt5P, rateP, base, range):
     vol = int((spread - base) / range)
     if vol >= 1:
         return True, vol, spread
-    return False, 0, 0
+    return False, 0, spread
 
 
 def should_open_order(ctpP, mt5P, rateP, base, range):
     # 是否需要开仓,返回 bool,区间值倍数,多/空 ,点差
-    is_open, vol, spread = is_open_short(ctpP, mt5P, rateP, base, range)
+    is_open, vol, short_spread = is_open_short(ctpP, mt5P, rateP, base, range)
     if is_open:
-        return is_open, vol, comm.ACTION_SHORT, spread
-    is_open, vol, spread = is_open_long(ctpP, mt5P, rateP, base, range)
+        return is_open, vol, comm.ACTION_SHORT, short_spread
+    is_open, vol, long_spread = is_open_long(ctpP, mt5P, rateP, base, range)
     if is_open:
-        return is_open, vol, comm.ACTION_SHORT, spread
-    return False, 0, "", 0
+        return is_open, vol, comm.ACTION_SHORT, long_spread
+    return False, 0, "", [short_spread,long_spread]
 
 
 def should_close_order(ctpP, mt5P, rateP, pOrder):
@@ -62,7 +73,7 @@ def should_close_order(ctpP, mt5P, rateP, pOrder):
         return True, spread
     if pOrder.longShort == comm.ACTION_LONG and pOrder.closeSpread >= spread:
         return True, spread
-    return False, 0
+    return False, spread
 
 
 def check_time_is_valid(t):
@@ -158,6 +169,7 @@ def send_order_to_server(c,symbol,longShort,openClose,vol,pid):
     order.pid=pid
     order.volume=vol
     msg = order.to_json()
+    log.info("send request: {}".format(msg))
     success, response = c.request(message=msg)
     return success, response
 
@@ -171,5 +183,71 @@ def sed_close_all_to_server(c,symbol,pid):
     success, response = c.request(message=msg)
     return success, response
 
+
+def mt5_api_get_tick_price_from_symbol(c,symbol):
+    order = models.Request()
+    order.request_type = models.REQ_MARKET
+    order.symbol=symbol
+    msg = order.to_json()
+    success, response = c.request(message=msg)
+    return success, response
+
+
 def float_equal(a, b, tol=1e-4):
     return abs(a - b) <= tol
+
+
+def caclu_ask_qty_and_traded_qty(orders,status,parent_ask_qty):
+    #   开仓阶段校验  /平仓阶段校验
+    #   平仓 非终态 5<=status<8  ,校验平常
+    #   开仓 非终态 1<status<3   ,校验开仓
+    traded_qty=0
+    openClose=comm.OFFSET_OPEN if status<3 else comm.OFFSET_CLOSE
+    for order in orders:
+        if status<3 and  order.openClose==comm.OFFSET_OPEN:
+            traded_qty+=order.bidVol
+        if status>5 and order.openClose==comm.OFFSET_CLOSE:
+            traded_qty += order.bidVol
+    diff_qty=parent_ask_qty-traded_qty
+    return float_equal(diff_qty,0),diff_qty,openClose
+
+def get_open_trade_bid_price(orders):
+    for child in orders:
+        if child.status == models.AllTrade and child.openClose==models.TRADE_TYPE_OPEN:
+            return child.bidPrice
+    return 0
+
+def get_close_trade_bid_price(orders):
+    for child in orders:
+        if child.status == models.AllTrade and child.openClose==models.TRADE_TYPE_CLOSE:
+            return child.bidPrice
+    return 0
+
+def get_err_orders(c,porder,parent_ask_qty,symbol,longshort,status):
+    # 检查子母单状态,看是否需要 +1
+    success, rsp = qry_child_order_from_pid(c, porder.entrustNo)
+    error_orders=[]
+    completeOrder, diff, open_close = caclu_ask_qty_and_traded_qty(rsp.orders, status,parent_ask_qty)
+    if not completeOrder:
+        order = comm.ErrorOrder(zmqClient=c, symbol=symbol, long_short=longshort, open_close=open_close, vol=diff, entrustNo=porder.entrustNo)
+        error_orders.append(order)
+
+    return success,rsp.orders,error_orders
+
+def get_porder_status_from_child_order(orders):
+    status=comm.PARENT_STATUS_UNKWON
+
+
+    return status
+
+def get_porder_openclose_from_ctp(c,porder):
+    # 母单是否开平仓以CTP是否开平仓为依据,所以CTP不用补单
+    success, rsp = qry_child_order_from_pid(c, porder.entrustNo)
+    status=comm.PARENT_STATUS_UNKWON
+    if len(rsp.orders)==0:
+        status=comm.PARENT_STATUS_OPEN_FAIL
+    elif len(rsp.orders)==1:
+        status=comm.PARENT_STATUS_OPEN_CTP
+    else:
+        status=comm.PARENT_STATUS_CLOSE_CTP
+    return success,rsp.orders,status

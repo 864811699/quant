@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field, asdict
 import zmq
 
-
 # SIDE_BUY="BUY"
 # SIDE_SELL="SELL"
 
@@ -25,6 +24,7 @@ PARENT_STATUS_CLOSE_MT5_1=7
 PARENT_STATUS_CLOSE_MT5_2=8
 # PARENT_STATUS_CLOSED=9
 PARENT_STATUS_ERROR=10
+PARENT_STATUS_OPEN_FAIL=11  # CTP开仓被拒绝
 
 
 @dataclass

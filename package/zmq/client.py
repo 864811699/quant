@@ -33,11 +33,3 @@ class ZmqClient:
         self.socket.close()
         self.context.term()
 
-if __name__ == '__main__':
-    c=ZmqClient("tcp://127.0.0.1:30001")
-    from package.zmq import models
-    order=models.Request()
-    order.request_type = models.REQ_POSITION
-    order.symbol="au2506"
-    msg = order.to_json()
-    print(c.request(order.to_json()))
