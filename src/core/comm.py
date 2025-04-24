@@ -1,0 +1,37 @@
+from dataclasses import dataclass, field, asdict
+import zmq
+
+
+# SIDE_BUY="BUY"
+# SIDE_SELL="SELL"
+
+ACTION_LONG= "LONG"
+ACTION_SHORT= "SHORT"
+
+OFFSET_OPEN="OPEN"
+OFFSET_CLOSE="CLOSE"
+
+
+PARENT_STATUS_UNKWON=-1
+PARENT_STATUS_OPEN_PENDING=0
+PARENT_STATUS_OPEN_CTP=1
+PARENT_STATUS_OPEN_MT5_1=2
+PARENT_STATUS_OPEN_MT5_2=3
+# PARENT_STATUS_OPENED=4
+
+# PARENT_STATUS_CLOSE_PENDING=5
+PARENT_STATUS_CLOSE_CTP=6
+PARENT_STATUS_CLOSE_MT5_1=7
+PARENT_STATUS_CLOSE_MT5_2=8
+# PARENT_STATUS_CLOSED=9
+PARENT_STATUS_ERROR=10
+
+
+@dataclass
+class ErrorOrder:
+    zmqClient: zmq.Socket
+    symbol:str =""
+    long_short: str = ""  # 多空方向
+    open_close: str = ""
+    vol: float = 0.0
+    entrustNo: int = 0

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>更新策略</title>
+    <style>
+        .module-container {
+            background-color: #f4f4f4; /* 模块背景色 */
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 1200px;
+            margin: 20px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+        }
+
+        h2 {
+            text-align: center;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        input, button {
+            padding: 10px;
+            font-size: 16px;
+        }
+
+        button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+
+        .module-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .row {
+            clear: both; /* 清除浮动影响 */
+            padding: 10px 0;
+        }
+
+        .left {
+            float: left;
+        }
+
+        .center {
+            float: left;
+            margin: 0 auto;
+            text-align: center;
+            width: 100%; /* 让其居中 */
+        }
+
+        .right {
+            float: right;
+        }
+
+        .input-container {
+            clear: both; /* 清除浮动影响 */
+            padding: 10px 0;
+        }
+
+        input {
+            width: 50px;
+        }
+
+
+    </style>
+</head>
+<body>
+<div class="module-container">
+    <h2>更新策略</h2>
+    <p>策略描述: 根据期货黄金的成交记录进行MT5的伦敦金/汇率的反向跟单</p>
+    <table border="1">
+        <tr>
+            <td>平台</td>
+            <td>标的</td>
+            <td>方向</td>
+            <td>数量(手)</td>
+        </tr>
+        <tr>
+            <td>期货</td>
+            <td id="ctp_symbol"> </td>
+            <td>多(空)</td>
+            <td>1</td>
+        </tr>
+        <tr>
+            <td>MT5</td>
+            <td id="mt5_symbol1"></td>
+            <td>空(多)</td>
+            <td><input type="number" id="mt5_vol1"></td>
+        </tr>
+        <tr>
+            <td>MT5</td>
+            <td id="mt5_symbol2"></td>
+            <td>空(多)</td>
+            <td> <input type="number" id="mt5_vol2"></td>
+        </tr>
+    </table>
+    <button onclick="submitData()">提交修改</button>
+    <button onclick="checkPosition()">重启策略,检查持仓</button>
+</div>
+
+<script>
+    window.onload = async function () {
+        try {
+            const response = await fetch('/strategy?action=strategy');
+            const data_json = await response.json();
+            data = JSON.parse(data_json)
+            document.getElementById('ctp_symbol').textContent = data.op1.symbol;
+            document.getElementById('mt5_symbol1').textContent = data.op2.symbol;
+            document.getElementById('mt5_symbol2').textContent = data.op3.symbol;
+            document.getElementById('mt5_vol1').value = data.op2.rate;
+            document.getElementById('mt5_vol2').value = data.op3.rate;
+        } catch (error) {
+            console.error('获取数据失败:', error);
+        }
+    }
+
+    // 提交数据
+    async function submitData() {
+        const userData = {
+            op1: {symbol:document.getElementById('ctp_symbol').textContent},
+            op2:{symbol:document.getElementById('mt5_symbol1').textContent,rate:parseFloat(document.getElementById('mt5_vol1').value)},
+            op3:{symbol:document.getElementById('mt5_symbol2').textContent,rate:parseFloat(document.getElementById('mt5_vol2').value)}
+        };
+
+        try {
+            const response = await fetch('/strategy?action=strategy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+
+            });
+            const result = await response.json();
+            alert(result.message);
+        } catch (error) {
+            console.error('提交数据失败:', error);
+        }
+    }
+    async function checkPosition() {
+        try {
+            const response = await fetch('/strategy?action=checkPosition')
+            const data_json = await response.json();
+            data = JSON.parse(data_json)
+            alert(data.message)
+        } catch (error) {
+            console.error('请求失败:', error);
+        }
+    }
+</script>
+</body>
+</html>
