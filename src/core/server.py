@@ -43,7 +43,6 @@ class Server:
         self.loadCfg()
         # self.queueCtpMD = queue.Queue()
         self.strategyStatus = False
-        self.strategyStatus
 
         self.OrdersDict = {}  # pid->POrder
         self.entrustNo = 0
@@ -83,7 +82,6 @@ class Server:
 
         self.zmqCtpClient = client.ZmqClient(self.zmqConfig['ctpReqAddr'])
         self.zmqCtpMarket = subscriber.ZmqSubscriber(self.zmqConfig['ctpSubAddr'], self.zmqConfig['topic'])
-
         self.zmqUSDClient = client.ZmqClient(self.zmqConfig['mt5USDCNHReqAddr'])
         self.zmqXAUClient = client.ZmqClient(self.zmqConfig['mt5XAUUSDReqAddr'])
         log.info("server init api success!!!")
@@ -96,7 +94,7 @@ class Server:
             exit(-1)
 
     def getEntrustNo(self):
-        self.entrustNo = self.entrustNo+1
+        self.entrustNo += 1
         return self.entrustNo
 
     def save_order(self, order):
@@ -391,6 +389,11 @@ class Server:
 
     def loadOrdersFromDB(self):
         # 导入本地mysql 所有委托,
+        # 查询ctp/mt5 委托
+
+        # 获取entrustNo
+        # 整理数据,检查持仓(清理异常持仓)
+        # maxEntrustNo
         pOrders = self.db.load_parent_orders(self.dbConfig["table"])
         for porder in pOrders:
             self.OrdersDict[porder.entrustNo]=porder
@@ -497,7 +500,6 @@ class Server:
 
             self.updateOrder(pOrder)
         log.info("reboot caculate spead success !!! ")
-
 
     def updateStrategy(self, data):
         # 先停止交易,更新完成后再执行交易

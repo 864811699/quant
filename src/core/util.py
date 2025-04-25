@@ -84,34 +84,6 @@ def check_time_is_valid(t):
     return False, current_time
 
 
-# def mt5_api_exec_order(mt5ApiConn,symbol,entrustNo,longShort,openClose,rate):
-#     req = mt5comm.Request()
-#     req.reqType = mt5comm.REQ_ORDER
-#     req.symbol = symbol
-#     req.longShort = longShort
-#     req.openClose = openClose
-#     req.magic = entrustNo
-#     req.volume = rate
-#     mt5ApiConn.send(req)
-#     # if mt5ApiConn.poll():
-#     rsp = mt5ApiConn.recv()
-#     return rsp
-
-# def mt5_api_get_tick_price_from_symbol(mt5ApiConn,symbol):
-#     req = mt5comm.Request()
-#     req.reqType = mt5comm.REQ_MARKET
-#     req.symbol = symbol
-#     mt5ApiConn.send(req)
-#     rsp = mt5ApiConn.recv()
-#     return rsp
-#
-# def mt5_get_finished_order_from_pid(mt5ApiConn,pid):
-#     req = mt5comm.Request()
-#     req.reqType = mt5comm.REQ_SEARCH
-#     req.pid = pid
-#     mt5ApiConn.send(req)
-#     rsp = mt5ApiConn.recv()
-#     return rsp
 
 def check_is_trade_time(stopDate, stopTime, stopDateTime):
     now = datetime.now()
@@ -132,14 +104,7 @@ def get_longShort_from_ctp_longShort(ctp_longShort):
     return comm.ACTION_SHORT if ctp_longShort == comm.ACTION_LONG else comm.ACTION_LONG
 
 
-# def mt5_api_close_all_position(mt5ApiConn,symbol,magic):
-#     req = mt5comm.Request()
-#     req.reqType = mt5comm.REQ_LIQUIDATE
-#     req.symbol=symbol
-#     req.magic=magic
-#     mt5ApiConn.send(req)
-#     rsp = mt5ApiConn.recv()
-#     return rsp
+
 
 def get_trade_vol_from_order(orders):
     # 获取成交次数
@@ -169,7 +134,7 @@ def send_order_to_server(c,symbol,longShort,openClose,vol,pid):
     order.pid=pid
     order.volume=vol
     msg = order.to_json()
-    log.info("send request: {}".format(msg))
+    log.info("send request: {}".format(order))
     success, response = c.request(message=msg)
     return success, response
 
