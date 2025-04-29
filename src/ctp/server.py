@@ -1,3 +1,4 @@
+import datetime
 import json
 
 import logging
@@ -79,22 +80,31 @@ class Server:
         return orders
 
     def save_order(self, order):
+        now=datetime.datetime.now()
         self.store_order(order)
         self.db.save_child_order(self.dbConfig["table"],order)
+        log.info("save DB order time:{}".format(datetime.datetime.now()-now))
         return True, ""
 
 
     def update_order(self, order):
         log.info("update order :{}".format(order))
+        now=datetime.datetime.now()
         self.store_order(order)
         self.db.update_child_order(self.dbConfig["table"],order)
+        log.info("update DB order time:{}".format(datetime.datetime.now()-now))
         return True, ""
 
+    def get_price(self,longshort, openclose,symbol):
+        side = comm.getSide(longshort, openclose)
+        market=self.ctpmdApi.get_market_dict(symbol)
+        price=0
+        if market is not None:
+            price = market[comm.MARKET_SELL1] if side == comm.SIDE_DICT["BUY"] else market[comm.MARKET_BUY1]
+        return price
+
     def create_order(self, symbol, pEntrustNo, longShort, openClose, Volume):
-        price = self.ctptdApi.GetPrice(self.ExchangeID, symbol, longShort, openClose)
-        if price == 0:
-            log.warning("ctp get price fail,pEntrustNo:{}".format(pEntrustNo))
-            return False, None
+        # price = self.ctptdApi.GetPrice(self.ExchangeID, symbol, longShort, openClose)
         order = models.Order()
         order.account = self.baseConfig["user"]
         order.symbol = symbol
@@ -103,11 +113,18 @@ class Server:
         order.orderRef = str(order.entrustNo)
         order.longShort = longShort
         order.openClose = openClose
-        order.askPrice = price
         order.parentAskQty = Volume
         order.askQty = Volume
         order.status = models.ORDER_STATUS_UNKNOWN
+
+        price = self.get_price(longShort, openClose,symbol)
+        if price ==0:
+            log.warning("ctp get price fail,pEntrustNo:{}".format(pEntrustNo))
+            order.status=6
+            order.statusMsg="qry price fail"
+        order.askPrice = price
         success, errmsg = self.save_order(order)
+
         if success:
             return True, order
         else:
@@ -189,22 +206,26 @@ class Server:
                 rsp = models.Response()
                 success, order = self.create_order(request["symbol"], request["pid"], request["longShort"], request["openClose"], request["volume"])
                 if success:
-                    ret = self.ctptdApi.ExecOrder(order)
-                    order = ret.order
-                    if ret.reqSuccess:
+                    if order.status==comm.ORDER_STATUS_UNKNOWN:
+                        ret = self.ctptdApi.ExecOrder(order)
+                        order = ret.order
+                        if ret.reqSuccess:
+                            rsp.req_success = True
+                            rsp.order = order
+                        else:
+                            rsp.req_success = False
+                            rsp.req_errmsg = "ctp trade fail,pEntrustNo:{} ,msg".format(request["pid"], ret.errorMsg)
+                            order.status = models.REJECTED
+                    else:
                         rsp.req_success = True
                         rsp.order = order
-                    else:
-                        rsp.req_success = False
-                        rsp.req_errmsg = "ctp trade fail,pEntrustNo:{} ,msg".format(request["pid"], ret.errorMsg)
-                        order.status = models.REJECTED
                     self.update_order(order)
                 else:
                     rsp.req_success = False
                     rsp.req_errmsg = f"create order fail"
                     log.warning("create order fail,pEntrustNo:{} ".format(request["pid"]))
                 json_str = rsp.to_json()
-                log.info("send order result: {}".format(json_str))
+                log.info("send order result: {}".format(rsp))
                 self.zmqServer.socket.send_string(json_str)  # 发送响应
             elif request["request_type"] == models.REQ_POSITION:
                 # TODO 有异常
@@ -213,7 +234,7 @@ class Server:
                 rsp.req_success = True
                 rsp.positions = positions
                 json_str = rsp.to_json()
-                log.info("send position result: {}".format(json_str))
+                log.info("send position result: {}".format(rsp))
                 self.zmqServer.socket.send_string(json_str)
 
             elif request["request_type"] == models.REQ_SEARCH:
@@ -222,7 +243,7 @@ class Server:
                 rsp.req_success = True
                 rsp.orders = orders
                 json_str = rsp.to_json()
-                log.info("send search result: {}".format(json_str))
+                log.info("send search result: {}".format(rsp))
                 self.zmqServer.socket.send_string(json_str)
             elif request["request_type"] == models.REQ_LIQUIDATE:
                 while True:
@@ -232,5 +253,5 @@ class Server:
                 rsp = models.Response()
                 rsp.req_success = True
                 json_str = rsp.to_json()
-                log.info("send close orders result: {}".format(json_str))
+                log.info("send close orders result: {}".format(rsp))
                 self.zmqServer.socket.send_string(json_str)

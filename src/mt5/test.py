@@ -1,9 +1,11 @@
+import datetime
+
 import MetaTrader5 as mt5
 from src.mt5 import mt5 as api
-account =76884201
-pwd = 'Aa123456@'
-broker_host = 'Exness-MT5Trial5'
-path='D:\\app\\MT5_EX\\terminal64.exe'
+account =52280144
+pwd = "pO7x@QvxO@j0Bv"
+broker_host = "ICMarketsSC-Demo"
+path="D:\\MT5\\ICMT5\\terminal64.exe"
 side={'buy':mt5.ORDER_TYPE_BUY,'sell':mt5.ORDER_TYPE_SELL}
 
 symbol= 'USDCNH'
@@ -18,10 +20,31 @@ entrust_no="0"
 if __name__ == '__main__':
     a=api.Mt5Api(path,account,pwd,broker_host,0)
     a.run()
+    account_info=mt5.account_info()
+    if account_info!=None:
+        print(f"balance:{account_info.balance}")
+        print(f"profit:{account_info.profit}")
+        print(f"equity:{account_info.equity}")
+        print(f"margin:{account_info.margin}")
+        print(f"margin_free:{account_info.margin_free}")
+        print(f"margin_level:{account_info.margin_level}")
+
+
+ # balance=99511.4：账户余额（不含当前持仓盈亏）
+# profit=41.82：当前持仓总浮动盈亏
+# equity=99553.22：净值（余额+浮动盈亏）
+# credit=0.0：信用额度（无负债）
+# 保证金参数
+# leverage=100：杠杆比例1:100
+# margin=98.18：已用保证金金额
+# margin_free=99455.04：可用保证金
+# margin_level=101398.67：保证金水平百分比（净值/保证金*100%）
+# margin_so_call=50.0：保证金追加警戒线比例
+# margin_so_so=30.0：强制平仓线比例
+
+
     # print(a.getHistoryOrders("123"))
     #action, symbol, lot, side, magic, comment, position=''
 
-    rtn=a.sendOrder(action,symbol,lot,side['sell'],magic,entrust_no,0)
-    print(rtn)
     # a.closeOrder(magic)
     # a.

@@ -5,113 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>更新策略</title>
     <style>
-        .module-container {
-            background-color: #f4f4f4; /* 模块背景色 */
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 1200px;
-            margin: 20px auto;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 阴影效果 */
+        .main-container {
+          display: flex;
+          justify-content: flex-start;
+          padding: 20px;
+          background-color: #f8f8f8;
         }
 
-        h2 {
-            text-align: center;
+        .left-column {
+          width: 440px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        .config-section {
+          background-color: white;
+          padding: 8px;
+          border-radius: 8px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-top: 10px;
+        }
+
+        table, th, td {
+          border: 1px solid #ccc;
+          padding: 6px;
+        }
+
+        caption {
+          text-align: center;
+          font-weight: bold;
+          padding: 8px;
         }
 
         button {
-            display: block;
-            width: 100%;
-            margin-bottom: 10px;
+          margin-top: 10px;
+          padding: 6px 12px;
         }
-
-        input, button {
-            padding: 10px;
-            font-size: 16px;
-        }
-
-        button {
-            background-color: #007BFF;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-
-        .module-container {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .row {
-            clear: both; /* 清除浮动影响 */
-            padding: 10px 0;
-        }
-
-        .left {
-            float: left;
-        }
-
-        .center {
-            float: left;
-            margin: 0 auto;
-            text-align: center;
-            width: 100%; /* 让其居中 */
-        }
-
-        .right {
-            float: right;
-        }
-
-        .input-container {
-            clear: both; /* 清除浮动影响 */
-            padding: 10px 0;
-        }
-
-        input {
-            width: 50px;
-        }
-
-
     </style>
 </head>
 <body>
-<div class="module-container">
-    <h2>更新策略</h2>
-    <p>策略描述: 根据期货黄金的成交记录进行MT5的伦敦金/汇率的反向跟单</p>
-    <table border="1">
-        <tr>
-            <td>平台</td>
-            <td>标的</td>
-            <td>方向</td>
-            <td>数量(手)</td>
-        </tr>
-        <tr>
-            <td>期货</td>
-            <td id="ctp_symbol"> </td>
-            <td>多(空)</td>
-            <td>1</td>
-        </tr>
-        <tr>
-            <td>MT5</td>
-            <td id="mt5_symbol1"></td>
-            <td>空(多)</td>
-            <td><input type="number" id="mt5_vol1"></td>
-        </tr>
-        <tr>
-            <td>MT5</td>
-            <td id="mt5_symbol2"></td>
-            <td>空(多)</td>
-            <td> <input type="number" id="mt5_vol2"></td>
-        </tr>
-    </table>
-    <button onclick="submitData()">提交修改</button>
-    <button onclick="checkPosition()">重启策略,检查持仓</button>
+<div class="main-container">
+  <div class="left-column">
+    <!-- 策略设置模块 -->
+    <section class="config-section">
+      <h3>策略基础设置</h3>
+      <table>
+        <tr><td>参数名</td><td colspan="2">数值</td></tr>
+        <tr><td>基准值</td><td colspan="2"><input type="number" id="startSpread"></td></tr>
+        <tr><td>区间值</td><td colspan="2"><input type="number" id="rangeSpread"></td></tr>
+        <tr><td>最大持仓</td><td colspan="2"><input type="number" id="maxVol"></td></tr>
+        <tr><td>区间开仓量</td><td colspan="2"><input type="number" id="rangeVol"></td></tr>
+      </table>
+      <button onclick="submitBaseData()">提交修改</button>
+    </section>
+
+
+    <section class="config-section">
+      <h3>比率配置</h3>
+      <table>
+        <tr><td>平台</td><td>标的</td><td colspan="2">方向</td><td>数量</td></tr>
+        <tr><td>期货</td><td id="ctp_symbol">13456</td><td>多</td><td>空</td><td><input type="number" id="ctp_vol"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol1"></td><td>空</td><td>多</td><td><input type="number" id="mt5_vol1"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol2"></td><td>空</td><td>多</td><td><input type="number" id="mt5_vol2"></td></tr>
+      </table>
+      <button onclick="submitData()">提交修改</button>
+    </section>
+
+
+    <!-- 限制交易时间模块 -->
+    <section class="config-section">
+      <h3>限制交易时间</h3>
+      <table>
+        <tr><td>类型</td><td>起始</td><td>截止</td></tr>
+        <tr><td>日期</td><td><input type="date" id="date_start"></td><td><input type="date" id="date_stop"></td></tr>
+        <tr><td>时间</td><td><input type="time" step="60" id="time_start"></td><td><input type="time" step="60" id="time_stop"></td></tr>
+        <tr><td>日期时间</td><td><input type="datetime-local" step="1" id="datetime_start"></td><td><input type="datetime-local" step="1" id="datetime_stop"></td></tr>
+      </table>
+      <button onclick="submitData()">提交修改</button>
+    </section>
+
+    </div>
 </div>
 
 <script>
@@ -121,6 +100,7 @@
             const data_json = await response.json();
             data = JSON.parse(data_json)
             document.getElementById('ctp_symbol').textContent = data.op1.symbol;
+            document.getElementById('ctp_vol').textContent = data.op1.rate;
             document.getElementById('mt5_symbol1').textContent = data.op2.symbol;
             document.getElementById('mt5_symbol2').textContent = data.op3.symbol;
             document.getElementById('mt5_vol1').value = data.op2.rate;
@@ -133,7 +113,7 @@
     // 提交数据
     async function submitData() {
         const userData = {
-            op1: {symbol:document.getElementById('ctp_symbol').textContent},
+            op1: {symbol:document.getElementById('ctp_symbol').textContent,rate:parseFloat(document.getElementById('ctp_vol').value)},
             op2:{symbol:document.getElementById('mt5_symbol1').textContent,rate:parseFloat(document.getElementById('mt5_vol1').value)},
             op3:{symbol:document.getElementById('mt5_symbol2').textContent,rate:parseFloat(document.getElementById('mt5_vol2').value)}
         };

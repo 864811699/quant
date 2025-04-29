@@ -16,13 +16,13 @@ class ZmqClient:
         self.socket = self.context.socket(zmq.REQ)  # 请求（Request）模式
         self.socket.connect(self.address)
 
-    def request(self, message: str, timeout=5):
+    def request(self, message: str, timeout=1000):
         """ 发送请求并等待响应 """
         self.socket.send_string(message)
         poller = zmq.Poller()
         poller.register(self.socket, zmq.POLLIN)
 
-        if poller.poll(timeout * 2000):  # 设置超时时间
+        if poller.poll(timeout * 4):  # 设置超时时间
             response = self.socket.recv_string()
             return True,json.loads(response,object_hook=models.custom_json_decoder)
         else:

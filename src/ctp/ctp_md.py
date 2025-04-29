@@ -3,15 +3,15 @@ import sys
 import thostmduserapi as mdapi  # manual mode
 import time
 import queue
-import json
-from dataclasses import  asdict
 import logging
+import threading
 from package.zmq import publisher
 from package.zmq import models
+from src.ctp import comm
 
 from package.logger.logger import setup_logger
 log = logging.getLogger('root')
-from src.ctp import comm
+
 
 class CMdImpl(mdapi.CThostFtdcMdSpi):
     def __init__(self, md_front, InstrumentIDs,port,topic):
@@ -24,9 +24,20 @@ class CMdImpl(mdapi.CThostFtdcMdSpi):
         self.zmq=publisher.ZmqPublisher(port,topic)
         self.msgID=1
 
+        self.lock=threading.Lock()
+        self.market_dict={}         # symbol->market{comm.MARKET_SELL1:1.1,comm.MARKET_SELL1:1.1}
 
-    # def getCTPMDQueue(self):
-    #     return self.queueCtpMD
+
+    def update_market_dict(self,ctpmd):
+        with self.lock:
+            self.market_dict[ctpmd.instrumentID]={comm.MARKET_SELL1:ctpmd.bidPrice1,comm.MARKET_BUY1:ctpmd.askPrice1}
+
+    def get_market_dict(self,symbol):
+        with self.lock:
+            if symbol in self.market_dict:
+                return self.market_dict[symbol]
+            else:
+                return None
 
 
     def Run(self):
@@ -72,6 +83,7 @@ class CMdImpl(mdapi.CThostFtdcMdSpi):
         rsp.market=ctpmd
         json_str = rsp.to_json()
         self.zmq.publish(json_str)
+        self.update_market_dict(ctpmd)
 
     def OnRspSubMarketData(self, pSpecificInstrument: 'CThostFtdcSpecificInstrumentField',
                            pRspInfo: 'CThostFtdcRspInfoField', nRequestID: 'int', bIsLast: 'bool') -> "void":

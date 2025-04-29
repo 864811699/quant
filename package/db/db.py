@@ -6,16 +6,18 @@ from package.zmq import models
 class dbServer:
     def __init__(self, cfg):
         self.cfg = cfg
-
-    def get_db(self):
+        self.engine = self._create_engine()
+    def _create_engine(self):
         user = self.cfg['user']
         pwd = self.cfg['pwd']
         host = self.cfg['host']
         db = self.cfg['db']
         charset = self.cfg['charset']
         connect_str = 'mysql+pymysql://{}:{}@{}/{}?charset={}'.format(user, pwd, host, db, charset)
-        conn = create_engine(connect_str)
-        return conn
+        engine = create_engine(connect_str, pool_size=10, max_overflow=20, pool_recycle=3600)
+        return engine
+    def get_db(self):
+        return self.engine
 
     def create_child_table(self):
         dest = self.get_db()
@@ -179,7 +181,7 @@ class dbServer:
                 "CTPAUBidPrice": order.CTPAUBidPrice,
                 "MT5AUAskPrice": order.MT5AUAskPrice,
                 "MT5AUBidPrice": order.MT5AUBidPrice,
-                "USDAskPrice": order.MT5AUBidPrice,
+                "USDAskPrice": order.USDAskPrice,
                 "USDBidPrice": order.USDBidPrice,
                 "spread": order.spread,
                 "realOpenSpread": order.realOpenSpread,

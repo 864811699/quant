@@ -263,21 +263,21 @@ class TdImpl(tdapi.CThostFtdcTraderSpi):
         # 默认平昨,除非昨日持仓为0
         # self.PositionDict[position.longShortType][position.PositionDate].
         with self.lock:
-            return comm.OFFSET_CLOSE_PREV if self.PositionDict[symbol][longshort][comm.POSITION_YESTERDAY]>0 else comm.OFFSET_CLOSE_TODAY
+            return comm.OFFSET_CLOSE_PREV if self.PositionDict[symbol][longshort][comm.POSITION_YESTERDAY] > 0 else comm.OFFSET_CLOSE_TODAY
 
     def after_trade_update_position(self,order,offset):
         with self.lock:
             # 1 开 : 只能增加今  +1
             # 2 平 : 今/昨 减   -1
-            if order.openClose==comm.OFFSET_OPEN:
+            if order.openClose == comm.OFFSET_OPEN:
                 if order.symbol not in self.PositionDict:
                     self.PositionDict[order.symbol]=comm.create_symbol_position_detail()
-                self.PositionDict[order.longShort][comm.POSITION_TODAY]+=1
-            elif order.openClose==comm.OFFSET_CLOSE:
-                if offset ==comm.OFFSET_CLOSE_TODAY:
-                    self.PositionDict[order.longShort][comm.POSITION_TODAY]-=1
-                elif offset ==comm.OFFSET_CLOSE_PREV:
-                    self.PositionDict[order.longShort][comm.POSITION_YESTERDAY] -= 1
+                self.PositionDict[order.symbol][order.longShort][comm.POSITION_TODAY] += 1
+            elif order.openClose == comm.OFFSET_CLOSE:
+                if offset == comm.OFFSET_CLOSE_TODAY:
+                    self.PositionDictPositionDict[order.symbol][order.longShort][comm.POSITION_TODAY] -= 1
+                elif offset == comm.OFFSET_CLOSE_PREV:
+                    self.PositionDictPositionDict[order.symbol][order.longShort][comm.POSITION_YESTERDAY] -= 1
             log.info("ctp update positions after trade :{}".format(self.PositionDict))
 
     def QryPositionDetail(self, InstrumentID):
@@ -309,23 +309,29 @@ class TdImpl(tdapi.CThostFtdcTraderSpi):
         req = tdapi.CThostFtdcQryDepthMarketDataField()
         req.ExchangeID = ExchangeID
         req.InstrumentID = InstrumentID
+        self.priceDict[comm.MARKET_INSTRUMENTID] = InstrumentID
         rtnNo = self.api.ReqQryDepthMarketData(req, 0)
         if rtnNo != 0:
-            self.semaphore.release()
+            # self.semaphore.release()
             errmsg = comm.ErrorCodeDict[rtnNo]
-            log.warning("qry Price [{}] fail, errmsg:{}".format(InstrumentID, errmsg))
-        else:
-            self.priceDict[comm.MARKET_INSTRUMENTID] = InstrumentID
-        log.info("Qry Price [{}] done".format(InstrumentID))
+            log.warning("qry Price [{}] fail,req ctp errmsg:{}".format(InstrumentID, errmsg))
+            return False
+        return True
 
     def GetPrice(self, ExchangeID, InstrumentID, longshort,openclose):
-        side = comm.getSide(longshort, openclose)
-        self.priceDict = {}
-        self.QryPrice(ExchangeID, InstrumentID)
-        success = self.semaphore.acquire(timeout=2)
         price = 0
+        side = comm.getSide(longshort, openclose)
+        self.priceDict = {comm.MARKET_SELL1:0,comm.MARKET_BUY1:0}
+        success=self.QryPrice(ExchangeID, InstrumentID)
+        if not success:
+            return price
+
+        success = self.semaphore.acquire(timeout=2)
         if success == True:
             price = self.priceDict[comm.MARKET_SELL1] if side == comm.SIDE_DICT["BUY"] else self.priceDict[comm.MARKET_BUY1]
+            log.info("Qry Price [{}] success, price.buy1:{} ,price.sell1:{}".format(InstrumentID,self.priceDict[comm.MARKET_BUY1],self.priceDict[comm.MARKET_SELL1]))
+        else:
+            log.warning("qry price [{}] fail,req ctp timeout".format(InstrumentID))
         return price
 
     def Authenticate(self):
