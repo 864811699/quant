@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta,time
 
 from src.core import comm
 from package.zmq import models
@@ -16,25 +16,27 @@ def get_caculate_close_spread(open_spread,base_spread,range_spread):
     return open_spread-range_spread if open_spread>base_spread else open_spread+range_spread
 
 
-def get_caculate_spread(ctpP, mt5P, rateP, action):
-    # 计算点差值
-    if action == comm.ACTION_LONG:
-        return ctpP.bidPrice1 - mt5P.askPrice1 / 31.1035 * rateP.askPrice1
-    else:
-        return ctpP.askPrice1 - mt5P.bidPrice1 / 31.1035 * rateP.bidPrice1
-
-
 def get_caculate_spread_from_price(ctpP, mt5P, rateP):
     if ctpP == 0 or mt5P == 0 or rateP == 0:
         return 0
-    return ctpP - mt5P / 31.1035 * rateP
+    return 100*(ctpP - mt5P / 31.1035 * rateP)
 
 
-# def get_caculate_close_spread(spread, longShort, closeRangeSpread):
-#     if longShort == comm.ACTION_LONG:
-#         return spread - closeRangeSpread
-#     if longShort == comm.ACTION_SHORT:
-#         return spread + closeRangeSpread
+def get_caculate_spread(ctpP, mt5P, rateP, action):
+    # 计算点差值
+    if action == comm.ACTION_LONG:
+        return get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
+    else:
+        return get_caculate_spread_from_price(ctpP.askPrice1,mt5P.bidPrice1,rateP.bidPrice1)
+
+def get_caculate_long_short_spread(ctpP, mt5P, rateP):
+    # 计算点差值 多,空
+    long_spread = get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
+    short_spread = get_caculate_spread_from_price(ctpP.askPrice1,mt5P.bidPrice1,rateP.bidPrice1)
+    return long_spread,short_spread
+
+
+#______________________________________________________________________________________
 
 
 def is_open_long(ctpP, mt5P, rateP, base, range):
@@ -83,17 +85,34 @@ def check_time_is_valid(t):
         return True, current_time
     return False, current_time
 
+def time_is_trade_time(now):
+    """判断当前是否是上期所黄金交易时间（含夜盘）"""
+    # 交易时间段定义
+    sessions = [
+        (time(9, 0,5), time(10, 14,40)),   # 白盘上午
+        (time(10, 15,5), time(11, 29,40)),   # 白盘上午
+        (time(13, 30,5), time(14, 59,40)),  # 白盘下午
+        (time(21, 0,5), time(23, 59, 59)), # 夜盘当天
+        (time(0, 0,0), time(2, 29,40))     # 夜盘次日凌晨
+    ]
 
+    now_time = now.time()
 
-def check_is_trade_time(stopDate, stopTime, stopDateTime):
+    # 检查是否在交易时间段内
+    for start, end in sessions:
+        if start <= now_time <= end:
+            return True
+    return False
+
+def check_is_trade_time(stopDate,  stopDateTime):
     now = datetime.now()
+    if not time_is_trade_time(now):
+        return False
+
     nowDate = now.strftime('%Y/%m/%d')
-    nowTime = now.strftime('%H:%M:%S')
     nowDateTime = now.strftime('%Y/%m/%d %H:%M:%S')
 
     if nowDate >= stopDate[0] and nowDate <= stopDate[1]:
-        return False
-    if nowTime >= stopTime[0] and nowTime <= stopTime[1]:
         return False
     if nowDateTime >= stopDateTime[0] and nowDateTime <= stopDateTime[1]:
         return False
@@ -169,9 +188,9 @@ def caclu_ask_qty_and_traded_qty(orders,status,parent_ask_qty):
     traded_qty=0
     openClose=comm.OFFSET_OPEN if status<3 else comm.OFFSET_CLOSE
     for order in orders:
-        if status<3 and  order.openClose==comm.OFFSET_OPEN:
+        if status<3 and status>=1 and  order.openClose==comm.OFFSET_OPEN:
             traded_qty+=order.bidVol
-        if status>5 and order.openClose==comm.OFFSET_CLOSE:
+        if status>5 and status<8 and order.openClose==comm.OFFSET_CLOSE:
             traded_qty += order.bidVol
     diff_qty=parent_ask_qty-traded_qty
     return float_equal(diff_qty,0),diff_qty,openClose
@@ -207,8 +226,10 @@ def get_porder_status_from_child_order(orders):
 
 def get_porder_openclose_from_ctp(c,porder):
     # 母单是否开平仓以CTP是否开平仓为依据,所以CTP不用补单
+    status = comm.PARENT_STATUS_UNKWON
     success, rsp = qry_child_order_from_pid(c, porder.entrustNo)
-    status=comm.PARENT_STATUS_UNKWON
+    if not success:
+        return success ,rsp,status
     if len(rsp.orders)==0:
         status=comm.PARENT_STATUS_OPEN_FAIL
     elif len(rsp.orders)==1:

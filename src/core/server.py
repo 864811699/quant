@@ -80,10 +80,10 @@ class Server:
 
         self.notifyApi = notify.Notify(self.notifyConfig['url'], self.notifyConfig['successAudio'], self.notifyConfig['failAudio'], self.notifyConfig['mentioned_list'])
 
-        self.zmqCtpClient = client.ZmqClient(self.zmqConfig['ctpReqAddr'])
+        self.zmqCtpClient = client.ZmqClient(self.zmqConfig['ctpReqAddr'],self.zmqConfig['timeout'])
         self.zmqCtpMarket = subscriber.ZmqSubscriber(self.zmqConfig['ctpSubAddr'], self.zmqConfig['topic'])
-        self.zmqUSDClient = client.ZmqClient(self.zmqConfig['mt5USDCNHReqAddr'])
-        self.zmqXAUClient = client.ZmqClient(self.zmqConfig['mt5XAUUSDReqAddr'])
+        self.zmqUSDClient = client.ZmqClient(self.zmqConfig['mt5USDCNHReqAddr'],self.zmqConfig['timeout'])
+        self.zmqXAUClient = client.ZmqClient(self.zmqConfig['mt5XAUUSDReqAddr'],self.zmqConfig['timeout'])
         log.info("server init api success!!!")
 
     def check_send_status(self, success,rsp, msg):
@@ -152,7 +152,7 @@ class Server:
         return orders
 
     def getPosition(self, longShort):
-        vol = 0.0
+        vol = 0
         for order in self.OrdersDict.values():
             if order.longShort == longShort and order.status > 1 and order.status < 4:
                 vol += 1
@@ -249,7 +249,7 @@ class Server:
             # 计算实际点差
             realSpread = util.get_caculate_spread_from_price(rtnExecOrder.order.bidPrice, xau_p, usd_p)
             order.realOpenSpread = realSpread
-            order.closeSpread = util.get_caculate_close_spread(realSpread, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"])
+            order.closeSpread = util.get_caculate_close_spread(realSpread, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["closeSpread"])
             self.updateOrder(order)
             log.info("server open order success,{}".format(order))
 
@@ -276,16 +276,20 @@ class Server:
             success, rtnExecOrder = util.send_order_to_server(self.zmqCtpClient, self.strategyConfig["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, self.strategyConfig["op1"]["rate"], order.entrustNo)
             self.check_send_status(success, rtnExecOrder , "  ctp close order")
             if rtnExecOrder.req_success:
-                order.status = comm.PARENT_STATUS_CLOSE_CTP
-                ctp_p = rtnExecOrder.order.bidPrice
-                self.updateOrder(order)
-                log.info("server close ctp order success,msg:{}".format(rtnExecOrder))
+                if rtnExecOrder.order.status==models.AllTrade:
+                    order.status = comm.PARENT_STATUS_CLOSE_CTP
+                    ctp_p = rtnExecOrder.order.bidPrice
+                    self.updateOrder(order)
+                    log.info("server close ctp order success,msg:{}".format(rtnExecOrder))
+                else:
+                    log.info("server close ctp fail,msg:{}".format(rtnExecOrder))
+                    return
             else:
-                log.info("server close ctp order fail,msg::{}".format(rtnExecOrder.errmsg))
+                log.info("server req close ctp order fail,msg::{}".format(rtnExecOrder.errmsg))
                 self.notifyApi.notify_trade_fail(order.speard, self.strategyConfig["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, self.strategyConfig["op1"]["rate"], rtnExecOrder.errmsg)
 
         mt5Action = util.get_longShort_from_ctp_longShort(order.longShort)
-        if order.status == 4:
+        if order.status == comm.PARENT_STATUS_CLOSE_CTP:
             # 平 伦敦金
             xauusd_askQty = self.strategyConfig["op2"]["rate"]
             xauusd_bidQty = 0
@@ -299,7 +303,7 @@ class Server:
                         xauusd_bidQty += rtnMt5Exec1.order.bidVol
                         log.info("mt5 close success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op2"]["symbol"], mt5Action, xauusd_bidQty, xau_p))
                     if float_equal(xauusd_askQty, 0):
-                        order.status = 5
+                        order.status = comm.PARENT_STATUS_CLOSE_MT5_1
                         self.updateOrder(order)
                         self.notifyApi.notify_trade_success()
                         # self.notifyApi.notify_trade_success(order.spread, self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, xauusd_askQty, xauusd_bidQty)
@@ -310,7 +314,7 @@ class Server:
                     #  发送成交失败通知
                     self.notifyApi.notify_trade_fail(order.speard,self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, self.strategyConfig["op2"]["rate"], rtnMt5Exec1.msg)
 
-        if order.status == 5:
+        if order.status == comm.PARENT_STATUS_CLOSE_MT5_1:
             #  mt5 汇率成交  订单成交通知
             usdcnh_askQty = self.strategyConfig["op3"]["rate"]
             usdcnh_bidQty = 0
@@ -324,7 +328,7 @@ class Server:
                         usdcnh_bidQty += rtnMt5Exec2.order.bidVol
                         log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op3"]["symbol"], mt5Action, usdcnh_bidQty, usd_p))
                     if float_equal(usdcnh_askQty, 0):
-                        order.status = 6
+                        order.status =comm.PARENT_STATUS_CLOSE_MT5_2
                         self.updateOrder(order)
                         self.notifyApi.notify_trade_success()
                         # self.notifyApi.notify_trade_success(order.spread, self.strategyConfig["op3"]["symbol"], mt5Action, comm.OFFSET_OPEN, usdcnh_askQty, usdcnh_bidQty)
@@ -394,10 +398,11 @@ class Server:
 
         need_to_close_orders=[]
         for order in orders:
-            is_close, spread = util.should_close_order(ctpMarket, XAUUSDm, USDCNHm, order)
-            log_msg+=f"\n\t\t\t\tentrustNo:{order.entrustNo}, need_to_close:{is_close} ,open_spread:{order.realOpenSpread:.2f},close_spread:{order.closeSpread:.2f}"
-            if is_close == True:
-                need_to_close_orders.append(order)
+            if order.status==comm.PARENT_STATUS_OPEN_MT5_2:
+                is_close, spread = util.should_close_order(ctpMarket, XAUUSDm, USDCNHm, order)
+                log_msg+=f"\n\t\t\t\tentrustNo:{order.entrustNo}, need_to_close:{is_close} ,open_spread:{order.realOpenSpread:.2f},close_spread:{order.closeSpread:.2f}"
+                if is_close == True:
+                    need_to_close_orders.append(order)
         log.info(log_msg)
 
         for order in need_to_close_orders:
@@ -527,7 +532,7 @@ class Server:
 
                 realSpread=util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)
                 pOrder.realOpenSpread=realSpread
-                pOrder.closeSpread=util.get_caculate_close_spread(realSpread,self.strategyConfig["base"]["startSpread"],self.strategyConfig["base"]["rangeSpread"])
+                pOrder.closeSpread=util.get_caculate_close_spread(realSpread,self.strategyConfig["base"]["startSpread"],self.strategyConfig["base"]["closeSpread"])
 
             elif pOrder.status ==comm.PARENT_STATUS_CLOSE_MT5_2:
                 # 若平仓,则计算 实际平仓点差  util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)

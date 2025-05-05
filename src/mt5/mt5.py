@@ -1,3 +1,5 @@
+import time
+
 import MetaTrader5 as mt5
 import os
 import sys
@@ -101,11 +103,18 @@ class Mt5Api:
 
     def reCloseOrder(self, order):
         position = self.getPositionID(order.pEntrustNo, order.symbol, order.longShort)
-        result = self.sendOrder(comm.ACTION, order.symbol, order.askQty,
-                                comm.getSide(order.longShort, comm.TRADE_TYPE_CLOSE),
-                                order.pEntrustNo,
-                                str(order.entrustNo), self.order_type_filling, position.ticket)
+        result = self.sendOrder(comm.ACTION, order.symbol, order.askQty, comm.getSide(order.longShort, comm.TRADE_TYPE_CLOSE), order.pEntrustNo, str(order.entrustNo), self.order_type_filling, position.ticket)
         return result
+
+    def getTradeInfo(self, orderId):
+        while True:
+            positions = mt5.positions_get(ticket=orderId)
+            if len(positions) == 1:
+                return True, positions[0].volume, positions[0].price_open
+            if positions == None:
+                return False, 0, 0
+            time.sleep(0.05)
+
 
     def ExecOrder(self, order):
         RtnRsp = comm.RtnRsp()
@@ -117,7 +126,7 @@ class Mt5Api:
                 # if result is None or result.retcode == mt5.TRADE_RETCODE_POSITION_CLOSED:
                 result = self.reCloseOrder(order)
                 if result is not None and result.retcode != mt5.TRADE_RETCODE_POSITION_CLOSED:
-                    isClosed=True
+                    isClosed = True
                     continue
                 if result is None:
                     order.status = comm.ORDER_STATUS_REJECTED
@@ -125,20 +134,33 @@ class Mt5Api:
                     isClosed = True
 
         elif order.openClose == comm.TRADE_TYPE_OPEN:
-            result = self.sendOrder(comm.ACTION, order.symbol, order.askQty,
-                                    comm.getSide(order.longShort, comm.TRADE_TYPE_OPEN),
-                                    order.pEntrustNo,
-                                    str(order.entrustNo), self.order_type_filling, "")
+            result = self.sendOrder(comm.ACTION, order.symbol, order.askQty, comm.getSide(order.longShort, comm.TRADE_TYPE_OPEN), order.pEntrustNo, str(order.entrustNo), self.order_type_filling, "")
             if result is None:
                 order.status = comm.ORDER_STATUS_REJECTED
                 order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
         if result is not None:
+            log.info(f"mt5 get entrustNo:{order.entrustNo},pId:{order.pEntrustNo} trade result {result}")
             if result.retcode == mt5.TRADE_RETCODE_DONE:
                 order.status = comm.ORDER_STATUS_AllTrade
                 order.orderSysID = str(result.order)
                 order.statusMsg = "全部成交"
                 order.bidVol = result.volume
                 order.bidPrice = result.price
+                if utils.float_equal(result.volume, 0) or utils.float_equal(result.price, 0):
+                    if order.openClose == comm.TRADE_TYPE_OPEN:
+                        success, volume, price = self.getTradeInfo(result.order)
+                        if success:
+                            order.bidVol = volume
+                            order.bidPrice = price
+                        else:
+                            log.error(f"entrustNo:{order.entrustNo},pId:{order.pEntrustNo},orderID:{result.order} qry trade info fail")
+                            time.sleep(2)
+                            exit(-2)
+
+                    else:
+                        order.bidVol = order.askQty
+                        mkt = self.get_tick_price_from_symbol(order.symbol)
+                        order.bidPrice = mkt.market.askPrice1 if order.openClose == comm.ACTION_SHORT else mkt.market.bidPrice1
                 RtnRsp.req_success = True
             elif result.retcode == mt5.TRADE_RETCODE_DONE_PARTIAL:
                 order.status = comm.ORDER_STATUS_PARTTRADE
@@ -155,68 +177,65 @@ class Mt5Api:
 
         order.rspTime = datetime.now()
         RtnRsp.order = order
-        log.info(
-            "mt5 order entrustNo:{} ,magic:{} ,symbol:{} ,vol:{} ,price:{} ,status:{} ,msg:{},".format(
-                order.entrustNo, order.pEntrustNo, order.symbol, order.bidVol, order.bidPrice, order.status,
-                order.statusMsg))
+        log.info("mt5 order entrustNo:{} ,magic:{} ,symbol:{} ,vol:{} ,price:{} ,status:{} ,msg:{},".format(order.entrustNo, order.pEntrustNo, order.symbol, order.bidVol, order.bidPrice, order.status, order.statusMsg))
 
         return RtnRsp
 
-    def ExecChildOrder(self, order):
-        # 作为一个执行策略,再次生成多个子单执行
-        RtnRsp = comm.RtnRsp()
-        result = None
-        if order.openClose == comm.TRADE_TYPE_CLOSE:
-            isClosed = False
-            while not isClosed:
-                # 平仓触发仓位已平，则重新平
-                if result is None or result.retcode == mt5.TRADE_RETCODE_POSITION_CLOSED:
-                    result = self.reCloseOrder(order)
-                    if result is not None and result.retcode != mt5.TRADE_RETCODE_POSITION_CLOSED:
-                        isClosed=True
-                    if result is None:
-                        order.status = comm.ORDER_STATUS_REJECTED
-                        order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
-                        isClosed = True
-
-
-        elif order.openClose == comm.TRADE_TYPE_OPEN:
-            result = self.sendOrder(comm.ACTION, order.symbol, order.askQty,
-                                    comm.getSide(order.longShort, comm.TRADE_TYPE_OPEN),
-                                    order.pEntrustNo,
-                                    str(order.entrustNo), self.order_type_filling, "")
-            if result is None:
-                order.status = comm.ORDER_STATUS_REJECTED
-                order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
-        if result is not None:
-            if result.retcode == mt5.TRADE_RETCODE_DONE:
-                order.status = comm.ORDER_STATUS_AllTrade
-                order.orderSysID = str(result.order)
-                order.statusMsg = "全部成交"
-                order.bidVol = result.volume
-                order.bidPrice = result.bidPrice
-                RtnRsp.req_success = True
-            elif result.retcode == mt5.TRADE_RETCODE_DONE_PARTIAL:
-                order.status = comm.ORDER_STATUS_PARTTRADE
-                order.orderSysID = str(result.order)
-                order.statusMsg = "部分成交"
-                order.bidVol = result.volume
-                order.bidPrice = result.bidPrice
-                RtnRsp.req_success = True
-            else:
-                order.status = comm.ORDER_STATUS_REJECTED
-                order.statusMsg = "拒单,code {}".format(result.retcode)
-                RtnRsp.req_success = False
-            order.orderSysID = result.order
-
-        order.rspTime = datetime.now()
-        RtnRsp.order = order
-        log.info(
-            "mt5 order entrustNo:{} ,magic:{} ,symbol:{} ,vol:{} ,price:{} ,status:{} ,msg:{},".format(
-                order.entrustNo, order.pEntrustNo, order.symbol, order.bidVol, order.bidPrice, order.status,
-                order.statusMsg))
-
-        return RtnRsp
+    # def ExecChildOrder(self, order):
+    #     # 作为一个执行策略,再次生成多个子单执行
+    #     RtnRsp = comm.RtnRsp()
+    #     result = None
+    #     if order.openClose == comm.TRADE_TYPE_CLOSE:
+    #         isClosed = False
+    #         while not isClosed:
+    #             # 平仓触发仓位已平，则重新平
+    #             if result is None or result.retcode == mt5.TRADE_RETCODE_POSITION_CLOSED:
+    #                 result = self.reCloseOrder(order)
+    #                 if result is not None and result.retcode != mt5.TRADE_RETCODE_POSITION_CLOSED:
+    #                     isClosed=True
+    #                 if result is None:
+    #                     order.status = comm.ORDER_STATUS_REJECTED
+    #                     order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
+    #                     isClosed = True
+    #
+    #
+    #     elif order.openClose == comm.TRADE_TYPE_OPEN:
+    #         result = self.sendOrder(comm.ACTION, order.symbol, order.askQty,
+    #                                 comm.getSide(order.longShort, comm.TRADE_TYPE_OPEN),
+    #                                 order.pEntrustNo,
+    #                                 str(order.entrustNo), self.order_type_filling, "")
+    #         if result is None:
+    #             order.status = comm.ORDER_STATUS_REJECTED
+    #             order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
+    #     if result is not None:
+    #         if result.retcode == mt5.TRADE_RETCODE_DONE:
+    #             order.status = comm.ORDER_STATUS_AllTrade
+    #             order.orderSysID = str(result.order)
+    #             order.statusMsg = "全部成交"
+    #             order.bidVol = result.volume
+    #             order.bidPrice = result.bidPrice
+    #             RtnRsp.req_success = True
+    #         elif result.retcode == mt5.TRADE_RETCODE_DONE_PARTIAL:
+    #             order.status = comm.ORDER_STATUS_PARTTRADE
+    #             order.orderSysID = str(result.order)
+    #             order.statusMsg = "部分成交"
+    #             order.bidVol = result.volume
+    #             order.bidPrice = result.bidPrice
+    #             RtnRsp.req_success = True
+    #         else:
+    #             order.status = comm.ORDER_STATUS_REJECTED
+    #             order.statusMsg = "拒单,code {}".format(result.retcode)
+    #             RtnRsp.req_success = False
+    #         order.orderSysID = result.order
+    #
+    #     order.rspTime = datetime.now()
+    #     RtnRsp.order = order
+    #     log.info(
+    #         "mt5 order entrustNo:{} ,magic:{} ,symbol:{} ,vol:{} ,price:{} ,status:{} ,msg:{},".format(
+    #             order.entrustNo, order.pEntrustNo, order.symbol, order.bidVol, order.bidPrice, order.status,
+    #             order.statusMsg))
+    #
+    #     return RtnRsp
 
     def getPostions(self):
         # 返回的是元组 tuple

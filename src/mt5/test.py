@@ -2,10 +2,10 @@ import datetime
 
 import MetaTrader5 as mt5
 from src.mt5 import mt5 as api
-account =52280144
-pwd = "pO7x@QvxO@j0Bv"
-broker_host = "ICMarketsSC-Demo"
-path="D:\\MT5\\ICMT5\\terminal64.exe"
+account =7333022
+pwd =""
+broker_host ="ICMarketsSC-MT5-2"
+path=1
 side={'buy':mt5.ORDER_TYPE_BUY,'sell':mt5.ORDER_TYPE_SELL}
 
 symbol= 'USDCNH'
@@ -15,7 +15,7 @@ lot =0.01
 timeType=mt5.ORDER_TIME_DAY  # 当前交易日有效
 orderType=side['buy']
 filling_type=mt5.ORDER_FILLING_IOC  # 立即成交,剩余撤销
-entrust_no="0"
+entrust_no=0
 
 if __name__ == '__main__':
     a=api.Mt5Api(path,account,pwd,broker_host,0)
@@ -29,6 +29,11 @@ if __name__ == '__main__':
         print(f"margin_free:{account_info.margin_free}")
         print(f"margin_level:{account_info.margin_level}")
 
+    #                action, symbol, lot, side, magic, comment, order_type_filling, position=''
+    rt=mt5.order_send(action, symbol, lot, side, magic, entrust_no,     filling_type, "")
+    if rt is None:
+        print(mt5.last_error())
+    print(rt)
 
  # balance=99511.4：账户余额（不含当前持仓盈亏）
 # profit=41.82：当前持仓总浮动盈亏

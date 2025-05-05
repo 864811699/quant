@@ -1,9 +1,9 @@
 [base]
 startSpread=100
 rangeSpread=20
+closeSpread=10
 maxVol=10                               #最大持仓
 stopDate = ["2025/03/20","2025/03/20"]  #以下3者配置任一生效则停止交易
-stopTime =["09:10:15","09:20:50"]
 stopDateTime=["2025/03/20 09:10:15","2025/03/20 09:20:50"]
 
 [op1]

@@ -9,6 +9,7 @@
 	mt5USDCNHReqAddr="tcp://127.0.0.1:30003"
 	mt5XAUUSDReqAddr="tcp://127.0.0.1:30002"
     topic="market"
+    timeout= 4 # 秒
 
 [notifyConfig]
     url=""                  # 企业微信机器人地址
