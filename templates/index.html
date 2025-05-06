@@ -18,6 +18,13 @@
           flex-direction: column;
           gap: 20px;
         }
+        .right-column {
+          width: 440px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+          margin-left: auto; /* 关键右对齐属性 */
+        }
 
         .config-section {
           background-color: white;
@@ -51,30 +58,31 @@
 </head>
 <body>
 <div class="main-container">
-  <div class="left-column">
+  <div class="left-column" id="LONG">
     <!-- 策略设置模块 -->
     <section class="config-section">
-      <h3>策略基础设置</h3>
+      <h3>策略设置(多)</h3>
       <table>
         <tr><td>参数名</td><td colspan="2">数值</td></tr>
-        <tr><td>基准值</td><td colspan="2"><input type="number" id="startSpread"></td></tr>
-        <tr><td>区间值</td><td colspan="2"><input type="number" id="rangeSpread"></td></tr>
-        <tr><td>最大持仓</td><td colspan="2"><input type="number" id="maxVol"></td></tr>
-        <tr><td>区间开仓量</td><td colspan="2"><input type="number" id="rangeVol"></td></tr>
+        <tr><td>基准点差</td><td colspan="2"><input type="number" id="start_spread_LONG"></td></tr>
+        <tr><td>区间点差</td><td colspan="2"><input type="number" id="range_spread_LONG"></td></tr>
+        <tr><td>平仓点差</td><td colspan="2"><input type="number" id="close_spread_LONG"></td></tr>
+        <tr><td>最大持仓</td><td colspan="2"><input type="number" id="max_vol_LONG"></td></tr>
+        <tr><td>策略状态</td><td colspan="2" id="is_run_LONG"></td></tr>
       </table>
-      <button onclick="submitBaseData()">提交修改</button>
+      <button onclick="submit_base_data('LONG')">更新策略</button>
     </section>
 
 
     <section class="config-section">
       <h3>比率配置</h3>
       <table>
-        <tr><td>平台</td><td>标的</td><td colspan="2">方向</td><td>数量</td></tr>
-        <tr><td>期货</td><td id="ctp_symbol">13456</td><td>多</td><td>空</td><td><input type="number" id="ctp_vol"></td></tr>
-        <tr><td>MT5</td><td id="mt5_symbol1"></td><td>空</td><td>多</td><td><input type="number" id="mt5_vol1"></td></tr>
-        <tr><td>MT5</td><td id="mt5_symbol2"></td><td>空</td><td>多</td><td><input type="number" id="mt5_vol2"></td></tr>
+        <tr><td>平台</td><td>标的</td><td >方向</td><td>数量</td></tr>
+        <tr><td>期货</td><td id="ctp_symbol_LONG"></td><td>多</td><td><input type="number" id="ctp_vol_LONG"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol1_LONG"></td><td>空</td><td><input type="number" id="mt5_vol1_LONG"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol2_LONG"></td><td>空</td><td><input type="number" id="mt5_vol2_LONG"></td></tr>
       </table>
-      <button onclick="submitData()">提交修改</button>
+      <button onclick="submit_strategy_data('LONG')">更新策略</button>
     </section>
 
 
@@ -83,43 +91,128 @@
       <h3>限制交易时间</h3>
       <table>
         <tr><td>类型</td><td>起始</td><td>截止</td></tr>
-        <tr><td>日期</td><td><input type="date" id="date_start"></td><td><input type="date" id="date_stop"></td></tr>
-        <tr><td>时间</td><td><input type="time" step="60" id="time_start"></td><td><input type="time" step="60" id="time_stop"></td></tr>
-        <tr><td>日期时间</td><td><input type="datetime-local" step="1" id="datetime_start"></td><td><input type="datetime-local" step="1" id="datetime_stop"></td></tr>
+        <tr><td>日期</td><td><input type="date"  id="date_start_LONG"></td><td><input type="date" id="date_stop_LONG"></td></tr>
+        <tr><td>日期时间</td><td><input type="datetime-local"  step="1" id="datetime_start_LONG"></td><td><input type="datetime-local" step="1" id="datetime_stop_LONG"></td></tr>
       </table>
-      <button onclick="submitData()">提交修改</button>
+      <button onclick="submit_time_data('LONG')">提交修改</button>
+      <button onclick="stop_strategy('LONG')">停止策略</button>
+      <button onclick="start_strategy('LONG')">启动策略</button>
+    </section>
+
+    </div>
+<!--------------------------------------------------------------------------------------------------->
+  <div class="right-column" id="SHORT">
+    <!-- 策略设置模块 -->
+    <section class="config-section">
+      <h3>策略设置(空)</h3>
+      <table>
+        <tr><td>参数名</td><td colspan="2">数值</td></tr>
+        <tr><td>基准点差</td><td colspan="2"><input type="number" id="start_spread_SHORT"></td></tr>
+        <tr><td>区间点差</td><td colspan="2"><input type="number" id="range_spread_SHORT"></td></tr>
+        <tr><td>平仓点差</td><td colspan="2"><input type="number" id="close_spread_SHORT"></td></tr>
+        <tr><td>最大持仓</td><td colspan="2"><input type="number" id="max_vol_SHORT"></td></tr>
+        <tr><td>策略状态</td><td colspan="2" id="is_run_SHORT"></td></tr>
+      </table>
+      <button onclick="submit_base_data('SHORT')">更新策略</button>
+    </section>
+
+
+    <section class="config-section">
+      <h3>比率配置</h3>
+      <table>
+        <tr><td>平台</td><td>标的</td><td>方向</td><td>数量</td></tr>
+        <tr><td>期货</td><td id="ctp_symbol_SHORT"></td><td>空</td><td><input type="number" id="ctp_vol_SHORT"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol1_SHORT"></td><td>多</td><td><input type="number" id="mt5_vol1_SHORT"></td></tr>
+        <tr><td>MT5</td><td id="mt5_symbol2_SHORT"></td><td>多</td><td><input type="number" id="mt5_vol2_SHORT"></td></tr>
+      </table>
+      <button onclick="submit_strategy_data('SHORT')">更新策略</button>
+    </section>
+
+
+    <!-- 限制交易时间模块 -->
+    <section class="config-section">
+      <h3>限制交易时间</h3>
+      <table>
+        <tr><td>类型</td><td>起始</td><td>截止</td></tr>
+        <tr><td>日期</td><td><input type="date"  id="date_start_SHORT"></td><td><input type="date" id="date_stop_SHORT"></td></tr>
+        <tr><td>日期时间</td><td><input type="datetime-local" step="1" id="datetime_start_SHORT"></td><td><input type="datetime-local" step="1" id="datetime_stop_SHORT"></td></tr>
+      </table>
+      <button onclick="submit_time_data('SHORT')">提交修改</button>
+      <button onclick="stop_strategy('SHORT')">停止策略</button>
+      <button onclick="start_strategy('SHORT')">启动策略</button>
     </section>
 
     </div>
 </div>
 
 <script>
-    window.onload = async function () {
-        try {
-            const response = await fetch('/strategy?action=strategy');
-            const data_json = await response.json();
-            data = JSON.parse(data_json)
-            document.getElementById('ctp_symbol').textContent = data.op1.symbol;
-            document.getElementById('ctp_vol').textContent = data.op1.rate;
-            document.getElementById('mt5_symbol1').textContent = data.op2.symbol;
-            document.getElementById('mt5_symbol2').textContent = data.op3.symbol;
-            document.getElementById('mt5_vol1').value = data.op2.rate;
-            document.getElementById('mt5_vol2').value = data.op3.rate;
-        } catch (error) {
-            console.error('获取数据失败:', error);
-        }
-    }
+    window.addEventListener('load', () => {
+      // 定义参数
+      const api1 = fetch('/strategy?action=strategy&longShort=LONG').then(res => res.json());
+      const api2 = fetch('/strategy?action=strategy&longShort=SHORT').then(res => res.json());
+      Promise.all([api1, api2])
+              .then(([data1_json, data2_json]) => {
+                data1 = JSON.parse(data1_json);
+                data2 = JSON.parse(data2_json);
+                document.getElementById('start_spread_LONG').value = data1.base.startSpread;
+                document.getElementById('range_spread_LONG').value = data1.base.rangeSpread;
+                document.getElementById('close_spread_LONG').value = data1.base.closeSpread;
+                document.getElementById('max_vol_LONG').value = data1.base.maxVol;
+                console.log( data1.base.isRun)
+                const statusCell = document.getElementById(`is_run_LONG`);
+                statusCell.style.backgroundColor = data1.base.isRun ? 'green':'red';
 
-    // 提交数据
-    async function submitData() {
+                document.getElementById('ctp_symbol_LONG').textContent = data1.op1.symbol;
+                document.getElementById('mt5_symbol1_LONG').textContent = data1.op2.symbol;
+                document.getElementById('mt5_symbol2_LONG').textContent = data1.op3.symbol;
+                document.getElementById('ctp_vol_LONG').value = data1.op1.rate;
+                document.getElementById('mt5_vol1_LONG').value = data1.op2.rate;
+                document.getElementById('mt5_vol2_LONG').value = data1.op3.rate;
+
+                document.getElementById('date_start_LONG').value = data1.base.stopDate[0];
+                document.getElementById('date_stop_LONG').value = data1.base.stopDate[1];
+                document.getElementById('datetime_start_LONG').value = data1.base.stopDateTime[0];
+                document.getElementById('datetime_stop_LONG').value = data1.base.stopDateTime[1];
+
+
+
+                document.getElementById('start_spread_SHORT').value = data2.base.startSpread;
+                document.getElementById('range_spread_SHORT').value = data2.base.rangeSpread;
+                document.getElementById('close_spread_SHORT').value = data2.base.closeSpread;
+                document.getElementById('max_vol_SHORT').value = data2.base.maxVol;
+                const statusCell2 = document.getElementById(`is_run_SHORT`);
+                statusCell2.style.backgroundColor = data2.base.isRun ? 'green':'red';
+
+                document.getElementById('ctp_symbol_SHORT').textContent = data2.op1.symbol;
+                document.getElementById('mt5_symbol1_SHORT').textContent = data2.op2.symbol;
+                document.getElementById('mt5_symbol2_SHORT').textContent = data2.op3.symbol;
+                document.getElementById('ctp_vol_SHORT').value = data2.op1.rate;
+                document.getElementById('mt5_vol1_SHORT').value = data2.op2.rate;
+                document.getElementById('mt5_vol2_SHORT').value = data2.op3.rate;
+
+                document.getElementById('date_start_SHORT').value = data2.base.stopDate[0];
+                document.getElementById('date_stop_SHORT').value = data2.base.stopDate[1];
+                document.getElementById('datetime_start_SHORT').value = data2.base.stopDateTime[0];
+                document.getElementById('datetime_stop_SHORT').value = data2.base.stopDateTime[1];
+              })
+              .catch(error => {
+                console.error('请求失败:', error);
+              });
+    })
+
+
+    // 修改基础策略
+    async function submit_base_data(longshort){
         const userData = {
-            op1: {symbol:document.getElementById('ctp_symbol').textContent,rate:parseFloat(document.getElementById('ctp_vol').value)},
-            op2:{symbol:document.getElementById('mt5_symbol1').textContent,rate:parseFloat(document.getElementById('mt5_vol1').value)},
-            op3:{symbol:document.getElementById('mt5_symbol2').textContent,rate:parseFloat(document.getElementById('mt5_vol2').value)}
+            long_short:longshort,
+            start_spread: parseInt(document.getElementById(`start_spread_${longshort}`).value),
+            range_spread: parseFloat(document.getElementById(`range_spread_${longshort}`).value),
+            close_spread: parseFloat(document.getElementById(`close_spread_${longshort}`).value),
+            max_vol: parseInt(document.getElementById(`max_vol_${longshort}`).value)
         };
 
         try {
-            const response = await fetch('/strategy?action=strategy', {
+            const response = await fetch('/strategy?action=update_base_strategy', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -133,16 +226,129 @@
             console.error('提交数据失败:', error);
         }
     }
-    async function checkPosition() {
+
+    // 修改核心策略
+    async function submit_strategy_data(longshort){
+        const userData = {
+            long_short:longshort,
+            op1_vol: parseInt(document.getElementById(`ctp_vol_${longshort}`).value),
+            op2_vol: parseFloat(document.getElementById(`mt5_vol1_${longshort}`).value),
+            op3_vol: parseFloat(document.getElementById(`mt5_vol2_${longshort}`).value)
+
+        };
+
         try {
-            const response = await fetch('/strategy?action=checkPosition')
-            const data_json = await response.json();
-            data = JSON.parse(data_json)
-            alert(data.message)
+            const response = await fetch('/strategy?action=update_core_strategy', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+
+            });
+            const result = await response.json();
+            alert(result.message);
         } catch (error) {
-            console.error('请求失败:', error);
+            console.error('提交数据失败:', error);
         }
     }
+
+    // 修改禁止交易时间
+    async function submit_time_data(longshort){
+          // 获取输入框的值
+          const dateStart = document.getElementById(`date_start_${longshort}`).value;
+          const dateStop = document.getElementById(`date_stop_${longshort}`).value;
+          const datetimeStart = document.getElementById(`datetime_start_${longshort}`).value;
+          const datetimeStop = document.getElementById(`datetime_stop_${longshort}`).value;
+
+          // 构造要提交的数据
+
+          const userData = {
+              long_short:longshort,
+              date_start: dateStart,
+              date_stop: dateStop,
+              datetime_start: datetimeStart,
+              datetime_stop: datetimeStop
+          };
+
+          try {
+              const response = await fetch('/strategy?action=update_time_strategy', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(userData)
+
+              });
+              const result = await response.json();
+              alert(result.message);
+          } catch (error) {
+              console.error('提交数据失败:', error);
+          }
+    }
+
+    async function stop_strategy(longshort){
+          const userData = {
+              long_short:longshort,
+          };
+          try {
+              const response = await fetch('/strategy?action=stop_strategy', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(userData)
+
+              });
+              const result = await response.json();
+              alert(result.message);
+            if (result.status){
+                const statusCell = document.getElementById(`is_run_${longshort}`);
+                statusCell.style.backgroundColor = 'red';
+              }
+          } catch (error) {
+              console.error('提交数据失败:', error);
+          }
+    }
+
+    async function start_strategy(longshort){
+          const userData = {
+              long_short:longshort,
+          };
+          try {
+              const response = await fetch('/strategy?action=start_strategy', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(userData)
+
+              });
+              const result = await response.json();
+              alert(result.message);
+              if (result.status){
+                const statusCell = document.getElementById(`is_run_${longshort}`);
+                statusCell.style.backgroundColor = 'green';
+              }
+          } catch (error) {
+              console.error('提交数据失败:', error);
+          }
+    }
+    async function close_positions(longshort){
+
+        try {
+            const response = await fetch(`/strategy?action=close_positions&longShort=${longshort}`, {
+                method: 'POST',
+            });
+            const result = await response.json();
+            alert(result.message);
+        } catch (error) {
+            console.error('提交数据失败:', error);
+        }
+    }
+
+
+
 </script>
 </body>
 </html>

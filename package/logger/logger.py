@@ -19,7 +19,7 @@ def setup_logger(filename):
     console_handler.setFormatter(log_format)
 
     #创建文件日志
-    file_log_handler = RotatingFileHandler("./{}-{}.log".format(filename,today), mode='a', maxBytes=2000*1024*1024,
+    file_log_handler = RotatingFileHandler("../log/{}-{}.log".format(filename,today), mode='a', maxBytes=2000*1024*1024,
                                           backupCount=100, encoding=None, delay=0)
     file_log_handler.setFormatter(log_format)
     file_log_handler.setLevel(logging.INFO)

@@ -27,12 +27,11 @@ def create_app(server):
             log.info(["get request get :: ", {'ip': request.remote_addr, 'url': request.url}, request.form])
 
             if action == 'strategy':
-                data = server.getStrategy()
+                longShort = request.args.get('longShort')
+                data = server.get_longshort_strategy(longShort)
                 return json.dumps(data), 200
 
-            if action == 'checkPosition':
-                server.reCheckPosition()
-                return {'message': '持仓检查成功'}, 200
+
 
             if action == 'closePositions':
                 closeStatus = server.closeAllOrders()
@@ -48,6 +47,37 @@ def create_app(server):
                 data = request.get_json()
                 server.updateStrategy(data)
                 return {'message': '更新成功'}, 200
+
+            if action == 'update_base_strategy':
+                data = request.get_json()
+                server.update_base_strategy(data)
+                return {'message': '策略更新成功'}, 200
+
+            if action == 'update_core_strategy':
+                data = request.get_json()
+                server.update_core_strategy(data)
+                return {'message': '策略更新成功'}, 200
+
+            if action == 'update_time_strategy':
+                data = request.get_json()
+                server.update_time_strategy(data)
+                return {'message': '策略更新成功'}, 200
+
+            if action == 'stop_strategy':
+                data = request.get_json()
+                status=server.stop_strategy(data)
+                return {'message': '策略停止','status':status}, 200
+
+            if action == 'start_strategy':
+                data = request.get_json()
+                status=server.start_strategy(data)
+                return {'message': '策略启动','status':status}, 200
+
+            if action == 'close_positions':
+                longShort = request.args.get('longShort')
+                server.close_all_positions(longShort)
+                return {'message': '清仓完成'}, 200
+
             return {'message': 'Invalid action'}, 404
 
     # 注册路由

@@ -3,5 +3,7 @@
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$/bin/ctp-20250428.log" charset="GBK" />
     <file url="file://$PROJECT_DIR$/build_ctp.bat" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/build_server.bat" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/build_usd.bat" charset="GBK" />
   </component>
 </project>

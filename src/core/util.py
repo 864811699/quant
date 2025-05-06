@@ -56,6 +56,18 @@ def is_open_short(ctpP, mt5P, rateP, base, range):
         return True, vol, spread
     return False, 0, spread
 
+def should_open_order_longshort(ctpP, mt5P, rateP, base, range,longshort):
+    spread=0.0
+    if longshort==comm.ACTION_SHORT:
+        is_open, vol, spread = is_open_short(ctpP, mt5P, rateP, base, range)
+        if is_open:
+            return is_open, vol,  spread
+
+    if longshort==comm.ACTION_LONG:
+        is_open, vol, spread = is_open_long(ctpP, mt5P, rateP, base, range)
+        if is_open:
+            return is_open, vol,  spread
+    return False, 0,  spread
 
 def should_open_order(ctpP, mt5P, rateP, base, range):
     # 是否需要开仓,返回 bool,区间值倍数,多/空 ,点差
@@ -67,13 +79,14 @@ def should_open_order(ctpP, mt5P, rateP, base, range):
         return is_open, vol, comm.ACTION_SHORT, long_spread
     return False, 0, "", [short_spread,long_spread]
 
-
 def should_close_order(ctpP, mt5P, rateP, pOrder):
     # 是否需要平仓
+    # 当前点差<=平仓点差  平空
+    # 当前点差>=平仓点差  平多
     spread = get_caculate_spread(ctpP, mt5P, rateP, pOrder.longShort)
-    if pOrder.longShort == comm.ACTION_SHORT and pOrder.closeSpread <= spread:
+    if pOrder.longShort == comm.ACTION_SHORT and pOrder.closeSpread >= spread:
         return True, spread
-    if pOrder.longShort == comm.ACTION_LONG and pOrder.closeSpread >= spread:
+    if pOrder.longShort == comm.ACTION_LONG and pOrder.closeSpread <= spread:
         return True, spread
     return False, spread
 
@@ -109,8 +122,8 @@ def check_is_trade_time(stopDate,  stopDateTime):
     if not time_is_trade_time(now):
         return False
 
-    nowDate = now.strftime('%Y/%m/%d')
-    nowDateTime = now.strftime('%Y/%m/%d %H:%M:%S')
+    nowDate = now.strftime('%Y-%m-%d')
+    nowDateTime = now.strftime('%Y-%m-%dT%H:%M:%S')
 
     if nowDate >= stopDate[0] and nowDate <= stopDate[1]:
         return False

@@ -275,9 +275,9 @@ class TdImpl(tdapi.CThostFtdcTraderSpi):
                 self.PositionDict[order.symbol][order.longShort][comm.POSITION_TODAY] += 1
             elif order.openClose == comm.OFFSET_CLOSE:
                 if offset == comm.OFFSET_CLOSE_TODAY:
-                    self.PositionDictPositionDict[order.symbol][order.longShort][comm.POSITION_TODAY] -= 1
+                    self.PositionDict[order.symbol][order.longShort][comm.POSITION_TODAY] -= 1
                 elif offset == comm.OFFSET_CLOSE_PREV:
-                    self.PositionDictPositionDict[order.symbol][order.longShort][comm.POSITION_YESTERDAY] -= 1
+                    self.PositionDict[order.symbol][order.longShort][comm.POSITION_YESTERDAY] -= 1
             log.info("ctp update positions after trade :{}".format(self.PositionDict))
 
     def QryPositionDetail(self, InstrumentID):

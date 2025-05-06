@@ -1,19 +1,43 @@
-[base]
-startSpread=100
-rangeSpread=20
-closeSpread=10
-maxVol=10                               #最大持仓
-stopDate = ["2025/03/20","2025/03/20"]  #以下3者配置任一生效则停止交易
-stopDateTime=["2025/03/20 09:10:15","2025/03/20 09:20:50"]
+[LONG.base]
+longShort = "LONG"
+isRun = true
+startSpread = 100
+rangeSpread = 20.2
+closeSpread = 10
+maxVol = 2
+stopDate = [ "2025-03-12", "2025-03-20",]
+stopDateTime = [ "2025-03-05T09:14:15", "2025-03-20T09:20:50",]
 
-[op1]
-symbol = "au2506"
-rate=1                  #  表示 每个区间最多加仓   策略(100,20), 140 最多持仓 6手,如果 100,120无,则再140补齐6手
+[LONG.op1]
+symbol = "au2508"
+rate = 1
 
-[op2]
-symbol = "GOLD#"
-rate = 0.2              # 每一手期货需要交易几手该标的
+[LONG.op2]
+symbol = "XAUUSD"
+rate = 0.01
 
-[op3]
+[LONG.op3]
 symbol = "USDCNH"
-rate = 0.85
+rate = 0.01
+
+[SHORT.base]
+longShort = "SHORT"
+isRun = true
+startSpread = 80
+rangeSpread = 50
+closeSpread = 10
+maxVol = 3
+stopDate = [ "2025-03-20", "2025-03-17",]
+stopDateTime = [ "2025-03-20T09:10:15", "2025-03-28T13:20:50",]
+
+[SHORT.op1]
+symbol = "au2508"
+rate = 1
+
+[SHORT.op2]
+symbol = "XAUUSD"
+rate = 0.01
+
+[SHORT.op3]
+symbol = "USDCNH"
+rate = 0.02

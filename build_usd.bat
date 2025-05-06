@@ -25,6 +25,10 @@ pyinstaller --clean --onefile ^
   --add-data "src/mt5;src/mt5" ^
   --add-data "package;package" ^
   --exclude-module __pycache__ ^
+  --exclude-module tkinter ^
+  --exclude-module pandas ^
+  --exclude-module matplotlib ^
+  --exclude-module PIL ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
   --hidden-import=toml ^
@@ -38,6 +42,7 @@ pyinstaller --clean --onefile ^
   --hidden-import=sqlalchemy ^
   --hidden-import=MetaTrader5 ^
   --hidden-import=threading ^
+  --hidden-import=numpy ^
   --name %app_name% ^
   %py_name%
 

@@ -2,7 +2,7 @@ import datetime
 import threading
 
 import concurrent.futures
-import copy
+
 import logging
 
 
@@ -30,7 +30,8 @@ class Server:
         self.notifyConfig = None
         self.zmqConfig = None
         self.dbConfig = None
-        self.thread = None
+        self.long_thread = None
+        self.short_thread = None
         self.notifyApi = None
         self.zmqCtpClient = None
         self.zmqCtpMarket = None
@@ -97,18 +98,96 @@ class Server:
         self.entrustNo += 1
         return self.entrustNo
 
-    def getStrategy(self):
+
+    def get_longshort_strategy(self,longshort):
         with self.lock:
-            strategyConfig = copy.deepcopy(self.strategyConfig)
-            log.info("strategy get success: {}".format(self.strategyConfig))
-            return strategyConfig
+            return {
+                "base": self.strategyConfig[longshort]["base"],
+                "op1": self.strategyConfig[longshort]["op1"],
+                "op2": self.strategyConfig[longshort]["op2"],
+                "op3": self.strategyConfig[longshort]["op3"]
+            }
 
 
+    def update_base_strategy(self,data):
+        long_short=data['long_short']
+        start_spread=data['start_spread']
+        range_spread=data['range_spread']
+        close_spread=data['close_spread']
+        max_vol=data['max_vol']
+
+        self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[long_short]['base']['startSpread']=start_spread
+            self.strategyConfig[long_short]['base']['rangeSpread']=range_spread
+            self.strategyConfig[long_short]['base']['closeSpread']=close_spread
+            self.strategyConfig[long_short]['base']['maxVol']=max_vol
+
+            self.cfg.write_strategy(self.strategyConfig)
+
+        for order  in self.OrdersDict.values():
+            if order.status < 4 and order.status>0:
+                self.OrdersDict[order.entrustNo].closeSpread = util.get_caculate_close_spread(order.realOpenSpread, self.strategyConfig[long_short]["base"]["startSpread"], self.strategyConfig[long_short]["base"]["rangeSpread"])
+
+        self.strategyStatus = True
+        log.info("strategy update success: {}".format(self.strategyConfig))
+
+    def update_core_strategy(self,data):
+        long_short=data['long_short']
+        ctp_vol=data['op1_vol']
+        xau_vol=data['op2_vol']
+        usd_vol=data['op3_vol']
+
+        self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[long_short]['op1']['rate']=ctp_vol
+            self.strategyConfig[long_short]['op2']['rate']=xau_vol
+            self.strategyConfig[long_short]['op3']['rate']=usd_vol
+
+            self.cfg.write_strategy(self.strategyConfig)
+
+        self.strategyStatus = True
+        log.info("strategy update success: {}".format(self.strategyConfig))
 
 
+    def update_time_strategy(self,data):
+        long_short=data['long_short']
+        date_start=data['date_start']
+        date_stop=data['date_stop']
+        datetime_start=data['datetime_start']
+        datetime_stop=data['datetime_stop']
 
+        self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[long_short]['base']['stopDate']=[date_start,date_stop]
+            self.strategyConfig[long_short]['base']['stopDateTime']=[datetime_start,datetime_stop]
 
+            self.cfg.write_strategy(self.strategyConfig)
 
+        self.strategyStatus = True
+        log.info("strategy update success: {}".format(self.strategyConfig))
+
+    def stop_strategy(self,data):
+        long_short=data['long_short']
+
+        self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[long_short]['base']['isRun'] =False
+            self.cfg.write_strategy(self.strategyConfig)
+        self.strategyStatus = True
+        log.info("strategy stop: {}".format(self.strategyConfig))
+        return True
+
+    def start_strategy(self,data):
+        long_short=data['long_short']
+
+        self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[long_short]['base']['isRun'] =True
+            self.cfg.write_strategy(self.strategyConfig)
+        self.strategyStatus = True
+        log.info("strategy stop: {}".format(self.strategyConfig))
+        return True
 
 
     def save_order(self, order):
@@ -144,10 +223,10 @@ class Server:
             log.warning("save order fail,pEntrustNo:{}  error:{}".format(order.entrustNo, errmsg))
             return False, None
 
-    def getNoFinishOrders(self):
+    def getNoFinishOrders(self,longshort):
         orders = []
         for order in self.OrdersDict.values():
-            if order.status < 6 and order.status > 0:
+            if order.status < 6 and order.status > 0 and order.longShort== longshort:
                 orders.append(order)
         return orders
 
@@ -159,29 +238,29 @@ class Server:
 
         return vol
 
-    def openOrder(self, action, spread, ctpMarket_askPrice1, ctpMarket_bidPrice1, XAUUSDm_askPrice1, XAUUSDm_bidPrice1, USDCNHm_askPrice1, USDCNHm_bidPrice1):
+    def openOrder(self, action, spread, ctpMarket_askPrice1, ctpMarket_bidPrice1, XAUUSDm_askPrice1, XAUUSDm_bidPrice1, USDCNHm_askPrice1, USDCNHm_bidPrice1,strategy):
         openOrderStatus = False
 
         # 开仓失败 或者不需要开仓,则更新数据库
-        success, order = self.create_order(action, ctpMarket_askPrice1, ctpMarket_bidPrice1, XAUUSDm_askPrice1, XAUUSDm_bidPrice1, USDCNHm_askPrice1, USDCNHm_bidPrice1, spread, self.strategyConfig["op1"]["rate"], self.strategyConfig["op2"]["rate"], self.strategyConfig["op3"]["rate"])
+        success, order = self.create_order(action, ctpMarket_askPrice1, ctpMarket_bidPrice1, XAUUSDm_askPrice1, XAUUSDm_bidPrice1, USDCNHm_askPrice1, USDCNHm_bidPrice1, spread, strategy["op1"]["rate"], strategy["op2"]["rate"], strategy["op3"]["rate"])
         if not success:
             self.notifyApi.notify_net_error("save db")
             exit(-1)
 
         # -1未知  0待开仓/ 1ctp开仓 / 2伦敦金开仓/ 3汇率开仓 /5 待平仓 /6 ctp平仓 /7 伦敦金平仓/ 8 汇率平仓  /10异常
         # 成交结果返回, 需要区分 异常 和 未成交
-        success, rtnExecOrder = util.send_order_to_server(self.zmqCtpClient, self.strategyConfig["op1"]["symbol"], action, comm.OFFSET_OPEN, self.strategyConfig["op1"]["rate"], order.entrustNo)
-        self.check_send_status(success, rtnExecOrder," ctp open order")
+        success, rtnExecOrder = util.send_order_to_server(self.zmqCtpClient, strategy["op1"]["symbol"], action, comm.OFFSET_OPEN, strategy["op1"]["rate"], order.entrustNo)
+        self.check_send_status(success, rtnExecOrder," ctp open order {}".format(action))
         if rtnExecOrder.req_success:
             # 系统撤单等非 系统本身异常的委托,直接废母单,其他未成交的委托返回请求失败,待下一次行情触发
             if rtnExecOrder.order.status != models.AllTrade:
                 order.status=comm.PARENT_STATUS_OPEN_FAIL
                 order.statusMsg=rtnExecOrder.order.statusMsg
                 self.updateOrder(order)
-                log.warning("ctp open order fail,order:{}".format(rtnExecOrder.order))
+                log.warning("ctp open order {} fail,order:{}".format(action,rtnExecOrder.order))
                 return False
             order.status = comm.PARENT_STATUS_OPEN_CTP
-            log.info("ctp open success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op1"]["symbol"], action, self.strategyConfig["op1"]["rate"], rtnExecOrder.order.bidPrice))
+            log.info("ctp open success,{}  {}  vol:{} ,price:{}".format(strategy["op1"]["symbol"], action, strategy["op1"]["rate"], rtnExecOrder.order.bidPrice))
             self.updateOrder(order)
             # self.notifyApi.notify_trade_success(spread, self.strategyConfig["op1"]["symbol"], action, comm.OFFSET_OPEN, self.strategyConfig["op1"]["rate"], self.strategyConfig["op1"]["rate"])
             self.notifyApi.notify_trade_success()
@@ -191,20 +270,20 @@ class Server:
             xau_p = 0.0
             usd_p = 0.0
             # mt5 伦敦金成交 订单成交通知
-            xauusd_askQty = self.strategyConfig["op2"]["rate"]
+            xauusd_askQty = strategy["op2"]["rate"]
             xauusd_bidQty = 0
 
             mt5Action = util.get_longShort_from_ctp_longShort(action)
             while True:
                 #c,symbol,longShort,openClose,vol,pid
-                success, rtnMt5Exec1 = util.send_order_to_server(self.zmqXAUClient, self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_OPEN,xauusd_askQty,order.entrustNo )
-                self.check_send_status(success, rtnExecOrder , "xau open order")
+                success, rtnMt5Exec1 = util.send_order_to_server(self.zmqXAUClient, strategy["op2"]["symbol"], mt5Action, comm.OFFSET_OPEN,xauusd_askQty,order.entrustNo )
+                self.check_send_status(success, rtnExecOrder , "xau open order {}".format(action))
                 if rtnMt5Exec1.req_success:
                     xau_p = rtnMt5Exec1.order.bidPrice
                     if rtnMt5Exec1.order.status == models.AllTrade or rtnMt5Exec1.order.status == models.PARTTRADE:
                         xauusd_askQty -= rtnMt5Exec1.order.bidVol
                         xauusd_bidQty += rtnMt5Exec1.order.bidVol
-                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op2"]["symbol"], action, xauusd_bidQty, xau_p))
+                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(strategy["op2"]["symbol"], action, xauusd_bidQty, xau_p))
                     if float_equal(xauusd_askQty, 0):
                         order.status = comm.PARENT_STATUS_OPEN_MT5_1
                         self.updateOrder(order)
@@ -213,17 +292,17 @@ class Server:
                         break
 
                 else:
-                    log.warning("mt5 open fail,spread:{}, {}  {}  {}  {}".format(spread, self.strategyConfig["op2"]["symbol"], mt5Action, xauusd_askQty, rtnMt5Exec1.msg))
+                    log.warning("mt5 open fail,spread:{}, {}  {}  {}  {}".format(spread, strategy["op2"]["symbol"], mt5Action, xauusd_askQty, rtnMt5Exec1.errmsg))
                     #  发送成交失败通知
-                    self.notifyApi.notify_trade_fail(spread, self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_OPEN, xauusd_askQty, rtnMt5Exec1.msg)
+                    self.notifyApi.notify_trade_fail(spread, strategy["op2"]["symbol"], mt5Action, comm.OFFSET_OPEN, xauusd_askQty, rtnMt5Exec1.errmsg)
                     self.strategyStatus = False
                     break
 
             #  mt5 汇率成交  订单成交通知
-            usdcnh_askQty = self.strategyConfig["op3"]["rate"]
+            usdcnh_askQty = strategy["op3"]["rate"]
             usdcnh_bidQty = 0
             while True:
-                success, rtnMt5Exec2 = util.send_order_to_server(self.zmqUSDClient, self.strategyConfig["op3"]["symbol"],mt5Action,comm.OFFSET_OPEN, usdcnh_askQty, order.entrustNo,  )
+                success, rtnMt5Exec2 = util.send_order_to_server(self.zmqUSDClient, strategy["op3"]["symbol"],mt5Action,comm.OFFSET_OPEN, usdcnh_askQty, order.entrustNo)
                 self.check_send_status(success, rtnExecOrder ,"usd open order")
                 #  mt5 汇率成交  订单成交通知
                 if rtnMt5Exec2.req_success:
@@ -231,7 +310,7 @@ class Server:
                     if rtnMt5Exec2.order.status == models.AllTrade or rtnMt5Exec2.order.status == models.PARTTRADE:
                         usdcnh_askQty -= rtnMt5Exec2.order.bidVol
                         usdcnh_bidQty += rtnMt5Exec2.order.bidVol
-                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op3"]["symbol"], action, usdcnh_bidQty, usd_p))
+                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(strategy["op3"]["symbol"], action, usdcnh_bidQty, usd_p))
                     if float_equal(usdcnh_askQty, 0):
                         order.status = comm.PARENT_STATUS_OPEN_MT5_2
                         self.updateOrder(order)
@@ -240,16 +319,16 @@ class Server:
                         break
 
                 else:
-                    log.warning("mt5 open fail,spread:{}, {}  {}  {}  {}".format(spread, self.strategyConfig["op3"]["symbol"], mt5Action, usdcnh_askQty, rtnMt5Exec2.msg))
+                    log.warning("mt5 open fail,spread:{}, {}  {}  {}  {}".format(spread, strategy["op3"]["symbol"], mt5Action, usdcnh_askQty, rtnMt5Exec2.errmsg))
                     #  发送成交失败通知
-                    self.notifyApi.notify_trade_fail(spread, self.strategyConfig["op3"]["symbol"], mt5Action, comm.OFFSET_OPEN, usdcnh_askQty, rtnMt5Exec2.msg)
+                    self.notifyApi.notify_trade_fail(spread, strategy["op3"]["symbol"], mt5Action, comm.OFFSET_OPEN, usdcnh_askQty, rtnMt5Exec2.errmsg)
                     self.strategyStatus = False
                     break
 
             # 计算实际点差
             realSpread = util.get_caculate_spread_from_price(rtnExecOrder.order.bidPrice, xau_p, usd_p)
             order.realOpenSpread = realSpread
-            order.closeSpread = util.get_caculate_close_spread(realSpread, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["closeSpread"])
+            order.closeSpread = util.get_caculate_close_spread(realSpread, strategy["base"]["startSpread"], strategy["base"]["closeSpread"])
             self.updateOrder(order)
             log.info("server open order success,{}".format(order))
 
@@ -260,12 +339,12 @@ class Server:
             self.updateOrder(order)
             log.info("server open order fail,msg:{}".format(rtnExecOrder.errmsg))
             #symbol, longshort, openclose, vol, msg
-            self.notifyApi.notify_trade_fail(spread, self.strategyConfig["op1"]["symbol"], action, comm.OFFSET_OPEN, self.strategyConfig["op1"]["rate"], rtnExecOrder.errmsg)
+            self.notifyApi.notify_trade_fail(spread, strategy["op1"]["symbol"], action, comm.OFFSET_OPEN, strategy["op1"]["rate"], rtnExecOrder.errmsg)
 
 
         return openOrderStatus
 
-    def closeOrder(self, order):
+    def closeOrder(self, order,strategy):
         # 根据order 状态平仓, 3 平全部,4 平mt5,5平外汇
         closeOrderStatus = False
         ctp_p = 0.0
@@ -273,7 +352,7 @@ class Server:
         usd_p = 0.0
         if order.status == comm.PARENT_STATUS_OPEN_MT5_2:
             # 4 ctp平仓 /5 伦敦金平仓/ 6汇率平仓
-            success, rtnExecOrder = util.send_order_to_server(self.zmqCtpClient, self.strategyConfig["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, self.strategyConfig["op1"]["rate"], order.entrustNo)
+            success, rtnExecOrder = util.send_order_to_server(self.zmqCtpClient, strategy["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, strategy["op1"]["rate"], order.entrustNo)
             self.check_send_status(success, rtnExecOrder , "  ctp close order")
             if rtnExecOrder.req_success:
                 if rtnExecOrder.order.status==models.AllTrade:
@@ -286,22 +365,22 @@ class Server:
                     return
             else:
                 log.info("server req close ctp order fail,msg::{}".format(rtnExecOrder.errmsg))
-                self.notifyApi.notify_trade_fail(order.speard, self.strategyConfig["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, self.strategyConfig["op1"]["rate"], rtnExecOrder.errmsg)
+                self.notifyApi.notify_trade_fail(order.speard, strategy["op1"]["symbol"], order.longShort, comm.OFFSET_CLOSE, strategy["op1"]["rate"], rtnExecOrder.errmsg)
 
         mt5Action = util.get_longShort_from_ctp_longShort(order.longShort)
         if order.status == comm.PARENT_STATUS_CLOSE_CTP:
             # 平 伦敦金
-            xauusd_askQty = self.strategyConfig["op2"]["rate"]
+            xauusd_askQty = strategy["op2"]["rate"]
             xauusd_bidQty = 0
             while True:
-                success, rtnMt5Exec1 = util.send_order_to_server(self.zmqXAUClient, self.strategyConfig["op2"]["symbol"],  mt5Action, comm.OFFSET_CLOSE, self.strategyConfig["op2"]["rate"],order.entrustNo)
+                success, rtnMt5Exec1 = util.send_order_to_server(self.zmqXAUClient, strategy["op2"]["symbol"],  mt5Action, comm.OFFSET_CLOSE, strategy["op2"]["rate"],order.entrustNo)
                 self.check_send_status(success, rtnExecOrder , "  xau close order")
                 if rtnMt5Exec1.req_success:
                     xau_p = rtnMt5Exec1.order.bidPrice
                     if rtnMt5Exec1.order.status == models.AllTrade or rtnMt5Exec1.order.status == models.PARTTRADE:
                         xauusd_askQty -= rtnMt5Exec1.order.bidVol
                         xauusd_bidQty += rtnMt5Exec1.order.bidVol
-                        log.info("mt5 close success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op2"]["symbol"], mt5Action, xauusd_bidQty, xau_p))
+                        log.info("mt5 close success,{}  {}  vol:{} ,price:{}".format(strategy["op2"]["symbol"], mt5Action, xauusd_bidQty, xau_p))
                     if float_equal(xauusd_askQty, 0):
                         order.status = comm.PARENT_STATUS_CLOSE_MT5_1
                         self.updateOrder(order)
@@ -310,23 +389,23 @@ class Server:
                         break
 
                 else:
-                    log.warning("mt5 close fail,spread:{}, {}  {}  {}  {}".format(order.spread, self.strategyConfig["op2"]["symbol"], mt5Action, xauusd_askQty, rtnMt5Exec1.msg))
+                    log.warning("mt5 close fail,spread:{}, {}  {}  {}  {}".format(order.spread, strategy["op2"]["symbol"], mt5Action, xauusd_askQty, rtnMt5Exec1.errmsg))
                     #  发送成交失败通知
-                    self.notifyApi.notify_trade_fail(order.speard,self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, self.strategyConfig["op2"]["rate"], rtnMt5Exec1.msg)
+                    self.notifyApi.notify_trade_fail(order.speard,strategy["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, strategy["op2"]["rate"], rtnMt5Exec1.errmsg)
 
         if order.status == comm.PARENT_STATUS_CLOSE_MT5_1:
             #  mt5 汇率成交  订单成交通知
-            usdcnh_askQty = self.strategyConfig["op3"]["rate"]
+            usdcnh_askQty = strategy["op3"]["rate"]
             usdcnh_bidQty = 0
             while True:
-                success, rtnMt5Exec2 = util.send_order_to_server(self.zmqUSDClient, self.strategyConfig["op3"]["symbol"], mt5Action, comm.OFFSET_CLOSE, self.strategyConfig["op3"]["rate"], order.entrustNo)
+                success, rtnMt5Exec2 = util.send_order_to_server(self.zmqUSDClient, strategy["op3"]["symbol"], mt5Action, comm.OFFSET_CLOSE, strategy["op3"]["rate"], order.entrustNo)
                 self.check_send_status(success, rtnExecOrder , "  xau close order")
                 if rtnMt5Exec2.req_success:
                     usd_p = rtnMt5Exec2.order.bidPrice
                     if rtnMt5Exec2.order.status == models.AllTrade or rtnMt5Exec2.order.status == models.PARTTRADE:
                         usdcnh_askQty -= rtnMt5Exec2.order.bidVol
                         usdcnh_bidQty += rtnMt5Exec2.order.bidVol
-                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(self.strategyConfig["op3"]["symbol"], mt5Action, usdcnh_bidQty, usd_p))
+                        log.info("mt5 open success,{}  {}  vol:{} ,price:{}".format(strategy["op3"]["symbol"], mt5Action, usdcnh_bidQty, usd_p))
                     if float_equal(usdcnh_askQty, 0):
                         order.status =comm.PARENT_STATUS_CLOSE_MT5_2
                         self.updateOrder(order)
@@ -335,8 +414,8 @@ class Server:
                         break
                 else:
                     #  发送成交失败通知
-                    log.warning("mt5 close fail,spread:{}, {}  {}  {}  {}".format(order.spread, self.strategyConfig["op3"]["symbol"], mt5Action, usdcnh_askQty, rtnMt5Exec2.msg))
-                    self.notifyApi.notify_trade_fail(order.speard,self.strategyConfig["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, self.strategyConfig["op2"]["rate"], rtnMt5Exec2.msg)
+                    log.warning("mt5 close fail,spread:{}, {}  {}  {}  {}".format(order.spread, strategy["op3"]["symbol"], mt5Action, usdcnh_askQty, rtnMt5Exec2.errmsg))
+                    self.notifyApi.notify_trade_fail(order.speard,strategy["op2"]["symbol"], mt5Action, comm.OFFSET_CLOSE, strategy["op2"]["rate"], rtnMt5Exec2.errmsg)
 
             # 计算实际点差
             order.realCloseSpread = util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)
@@ -346,55 +425,44 @@ class Server:
 
         return closeOrderStatus
 
-    def closeAllOrders(self):
-        # 清仓指令开始时先 关闭策略
+    def close_all_positions(self,longshort):
+        #TODO 清仓指令开始时先 关闭策略 按策略清
         self.strategyStatus = False
+        with self.lock:
+            self.strategyConfig[longshort]['base']['isRun']=False
         closeAllOrdersStatus = False
         while True:
-            orders = self.getNoFinishOrders()
-            needCloseN = len(orders)
-            if needCloseN == 0:
-                return closeAllOrdersStatus
+            orders = self.getNoFinishOrders(longshort)
+            if len(orders) == 0:
+                closeAllOrdersStatus=True
+                break
             else:
-                log.info("server need to close orders vol: {}".format(needCloseN))
+                log.info("server need to close orders vol: {}".format(len(orders)))
                 # 清仓 ctp
-                entrustNo = self.getEntrustNo()
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future1 = executor.submit(util.sed_close_all_to_server, self.zmqCtpClient, self.strategyConfig["op1"]["symbol"], entrustNo)
-                    future2 = executor.submit(util.sed_close_all_to_server, self.zmqXAUClient, self.strategyConfig["op2"]["symbol"], entrustNo)
-                    future3 = executor.submit(util.sed_close_all_to_server, self.zmqUSDClient, self.strategyConfig["op3"]["symbol"], entrustNo)
-                    close_ctp_status = future1.result()
-                    close_mt51_status = future2.result()
-                    close_mt52_status = future3.result()
-                    if close_ctp_status is False or close_mt51_status is False or close_mt52_status is False:
-                        close_fail_symbol = ""
-                        if close_ctp_status is False:
-                            close_fail_symbol += self.strategyConfig["op1"]["symbol"] + "  "
-                        if close_mt51_status is False:
-                            close_fail_symbol += self.strategyConfig["op2"]["symbol"] + "  "
-                        if close_mt52_status is False:
-                            close_fail_symbol += self.strategyConfig["op3"]["symbol"]
-                        self.notifyApi.notify_close_all_order_fail(close_fail_symbol)
-                        log.warning("server closed all orders fail !!!!!!!!!!!!!!! ")
+                for order in orders:
+                    strategy=self.get_longshort_strategy(order.longShort)
+                    self.closeOrder(order,strategy)
         log.info("server closed all orders success !!!!!!!!!!!!!!!")
 
-    def check_position_limit(self,action,vol):
-        current_positon = self.getPosition(action)
+    def check_position_limit(self,strategy,vol):
+        longshort=strategy["base"]["longShort"]
+        current_positon = self.getPosition(longshort)
         #检查总的最大值
-        if current_positon >= self.strategyConfig["base"]["maxVol"]:
-            return False ,current_positon,self.strategyConfig["base"]["maxVol"]
+        if current_positon >= strategy["base"]["maxVol"]:
+            return False ,current_positon,strategy["base"]["maxVol"]
         # 检查挡位最大值
-        if current_positon >= self.strategyConfig["op1"]["rate"]*vol:
-            return False,current_positon,self.strategyConfig["op1"]["rate"]*vol
-        return True,current_positon,self.strategyConfig["base"]["maxVol"]
+        if current_positon >= strategy["op1"]["rate"]*vol:
+            return False,current_positon,strategy["op1"]["rate"]*vol
+        return True,current_positon,strategy["base"]["maxVol"]
 
 
-    def checkShouldCloseOrder(self, ctpMarket, XAUUSDm, USDCNHm):
-        orders = self.getNoFinishOrders()
-        start_spread=self.strategyConfig["base"]["startSpread"]
-        range_spread=self.strategyConfig["base"]["rangeSpread"]
+    def checkShouldCloseOrder(self, ctpMarket, XAUUSDm, USDCNHm,strategy):
+        longShort=strategy["base"]["longShort"]
+        orders = self.getNoFinishOrders(longShort)
+        start_spread=strategy["base"]["startSpread"]
+        range_spread=strategy["base"]["rangeSpread"]
         long_spread,short_spread=util.get_caculate_long_short_spread(ctpMarket, XAUUSDm, USDCNHm)
-        log_msg=f"check order should to be closed,current_long_spread:{long_spread:.2f}, current_short_spread:{short_spread:.2f}, start_spread:{start_spread:.0f}, range_spread:{range_spread:.0f}"
+        log_msg=f"check {longShort} order should to be closed,current_long_spread:{long_spread:.2f}, current_short_spread:{short_spread:.2f}, start_spread:{start_spread:.0f}, range_spread:{range_spread:.0f}"
 
         need_to_close_orders=[]
         for order in orders:
@@ -406,33 +474,34 @@ class Server:
         log.info(log_msg)
 
         for order in need_to_close_orders:
-            success = self.closeOrder(order)
+            success = self.closeOrder(order,strategy)
             if success:
                 current_position = self.getPosition(order.longShort)
-                log.info("close order success,current positions={}".format(current_position))
+                log.info("close order success,{}  current positions={}".format(longShort,current_position))
                 # 汇总通知 start, strategy_range, spread,longshort, openClose, position
-                self.notifyApi.send_trade_result(self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"], order.spread, order.longShort, comm.OFFSET_CLOSE, current_position)
+                self.notifyApi.send_trade_result(strategy["base"]["startSpread"], strategy["base"]["rangeSpread"], order.spread, order.longShort, comm.OFFSET_CLOSE, current_position)
 
-    def checkShouldOpenOrder(self, ctpMarket, XAUUSDm, USDCNHm):
-        is_open, vol, action, spread = util.should_open_order(ctpMarket, XAUUSDm, USDCNHm, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"])
+    def checkShouldOpenOrder(self, ctpMarket, XAUUSDm, USDCNHm,strategy):
+        longshort=strategy["base"]["longShort"]
+        is_open, vol,  spread = util.should_open_order_longshort(ctpMarket, XAUUSDm, USDCNHm, strategy["base"]["startSpread"], strategy["base"]["rangeSpread"],longshort)
         # is_open 为False,spread 为[空点差,多点差], True 为点差
         if  not is_open:
-            log.info("this market not to open ,[short_spread,long_spread]==>{}".format(spread))
+            log.info("this market not to open {},[short_spread,long_spread]==>{}".format(longshort,spread))
             return
 
-        log.info("this market could to open order :{} ,current_spread:{:.2f},start_spread:{:.2f},range_spread:{:.2f}".format(is_open, spread, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"]))
-        is_open,current_position,max_position=self.check_position_limit(action,vol*self.strategyConfig["op1"]["rate"])
+        log.info("this market could to open order {}:{} ,current_spread:{:.2f},start_spread:{:.2f},range_spread:{:.2f}".format(longshort,is_open, spread, strategy["base"]["startSpread"], strategy["base"]["rangeSpread"]))
+        is_open,current_position,max_position=self.check_position_limit(strategy,vol*strategy["op1"]["rate"])
         # 区间最大手数=区间倍数*区间手数
         if not is_open:
-            log.info("not should to open ,current_position[{}] >= max_position[{}], not to open order".format(current_position, max_position))
+            log.info("not should to open {},current_position[{}] >= max_position[{}], not to open order".format(longshort,current_position, max_position))
             return
 
         if is_open:
-            success=self.openOrder(action, spread, ctpMarket.askPrice1, ctpMarket.bidPrice1, XAUUSDm.askPrice1, XAUUSDm.bidPrice1, USDCNHm.askPrice1, USDCNHm.bidPrice1)
+            success=self.openOrder(longshort, spread, ctpMarket.askPrice1, ctpMarket.bidPrice1, XAUUSDm.askPrice1, XAUUSDm.bidPrice1, USDCNHm.askPrice1, USDCNHm.bidPrice1,strategy)
             if success:
-                current_position=self.getPosition(action)
-                log.info("open order success,current positions={}".format(current_position))
-                self.notifyApi.send_trade_result(self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"], spread, action, comm.OFFSET_OPEN,current_position)
+                current_position=self.getPosition(longshort)
+                log.info("open order {} success,current positions={}".format(longshort,current_position))
+                self.notifyApi.send_trade_result(strategy["base"]["startSpread"], strategy["base"]["rangeSpread"], spread, longshort, comm.OFFSET_OPEN,current_position)
 
 
     def loadOrdersFromDB(self):
@@ -462,7 +531,7 @@ class Server:
             # 设置初始状态, 不补单则代表该子单已完成,状态+1 ,由于状态以 CTP 开平做标准,故CTP状态不做处理
             success,ctp_orders,tmp_status=util.get_porder_openclose_from_ctp(self.zmqCtpClient,porder)
             self.check_send_status(success, ctp_orders,"ctp search")
-            child_orders_dict[self.strategyConfig["op1"]["symbol"]] = ctp_orders
+            child_orders_dict[self.strategyConfig["LONG"]["op1"]["symbol"]] = ctp_orders
             if tmp_status==comm.PARENT_STATUS_OPEN_FAIL:
                 porder.status=comm.PARENT_STATUS_OPEN_FAIL
                 self.updateOrder(porder)
@@ -470,17 +539,17 @@ class Server:
 
             # 校验MT5-1
             longshort=util.get_longShort_from_ctp_longShort(porder.longShort)
-            success, xau_orders, xau_errors_orders = util.get_err_orders(self.zmqXAUClient, porder, porder.askMt51Qty, self.strategyConfig["op2"]["symbol"], longshort,tmp_status)
+            success, xau_orders, xau_errors_orders = util.get_err_orders(self.zmqXAUClient, porder, porder.askMt51Qty, self.strategyConfig["LONG"]["op2"]["symbol"], longshort,tmp_status)
             self.check_send_status(success,xau_orders, "xau search")
-            child_orders_dict[self.strategyConfig["op2"]["symbol"]] = xau_orders
+            child_orders_dict[self.strategyConfig["LONG"]["op2"]["symbol"]] = xau_orders
             self.ErrorOrders.extend(xau_errors_orders)
             if len(xau_errors_orders)==0:
                 tmp_status+=1
 
             # 校验MT5-2
-            success, usd_orders, usd_errors_orders = util.get_err_orders(self.zmqUSDClient,porder, porder.askMt52Qty,self.strategyConfig["op3"]["symbol"],longshort,tmp_status)
+            success, usd_orders, usd_errors_orders = util.get_err_orders(self.zmqUSDClient,porder, porder.askMt52Qty,self.strategyConfig["LONG"]["op3"]["symbol"],longshort,tmp_status)
             self.check_send_status(success,usd_orders, "usd search")
-            child_orders_dict[self.strategyConfig["op3"]["symbol"]] = usd_orders
+            child_orders_dict[self.strategyConfig["LONG"]["op3"]["symbol"]] = usd_orders
             self.ErrorOrders.extend(usd_errors_orders)
             if len(usd_errors_orders)==0:
                 tmp_status+=1
@@ -521,49 +590,39 @@ class Server:
             pOrder=self.OrdersDict[pid]
             if pOrder.status ==comm.PARENT_STATUS_OPEN_MT5_2:
                 # 若开仓,则计算 实际开仓点差和预期平仓点差  开仓:util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)   预期平: order.closeSpread = realOpenSpread - self.strategyConfig["base"]["rangeSpread"]
-                ctpOrders = childOrders[self.strategyConfig["op1"]["symbol"]]
+                ctpOrders = childOrders[self.strategyConfig["LONG"]["op1"]["symbol"]]
                 ctp_p=util.get_open_trade_bid_price(ctpOrders)
+                longshort=ctpOrders[0].longShort
 
-                xauOrders = childOrders[self.strategyConfig["op2"]["symbol"]]
+
+                xauOrders = childOrders[self.strategyConfig["LONG"]["op2"]["symbol"]]
                 xau_p=util.get_open_trade_bid_price(xauOrders)
 
-                usdOrders = childOrders[self.strategyConfig["op3"]["symbol"]]
+                usdOrders = childOrders[self.strategyConfig["LONG"]["op3"]["symbol"]]
                 usd_p=util.get_open_trade_bid_price(usdOrders)
 
                 realSpread=util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)
                 pOrder.realOpenSpread=realSpread
-                pOrder.closeSpread=util.get_caculate_close_spread(realSpread,self.strategyConfig["base"]["startSpread"],self.strategyConfig["base"]["closeSpread"])
+                if longshort ==comm.ACTION_LONG:
+                    pOrder.closeSpread=util.get_caculate_close_spread(realSpread,self.strategyConfig["LONG"]["base"]["startSpread"],self.strategyConfig["LONG"]["base"]["closeSpread"])
+                else:
+                    pOrder.closeSpread = util.get_caculate_close_spread(realSpread, self.strategyConfig["SHORT"]["base"]["startSpread"], self.strategyConfig["SHORT"]["base"]["closeSpread"])
 
             elif pOrder.status ==comm.PARENT_STATUS_CLOSE_MT5_2:
                 # 若平仓,则计算 实际平仓点差  util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)
-                ctpOrders = childOrders[self.strategyConfig["op1"]["symbol"]]
+                ctpOrders = childOrders[self.strategyConfig["LONG"]["op1"]["symbol"]]
                 ctp_p=util.get_close_trade_bid_price(ctpOrders)
 
-                xauOrders = childOrders[self.strategyConfig["op2"]["symbol"]]
+                xauOrders = childOrders[self.strategyConfig["LONG"]["op2"]["symbol"]]
                 xau_p=util.get_close_trade_bid_price(xauOrders)
 
-                usdOrders = childOrders[self.strategyConfig["op3"]["symbol"]]
+                usdOrders = childOrders[self.strategyConfig["LONG"]["op3"]["symbol"]]
                 usd_p=util.get_close_trade_bid_price(usdOrders)
 
                 pOrder.realCloseSpread=util.get_caculate_spread_from_price(ctp_p, xau_p, usd_p)
 
             self.updateOrder(pOrder)
         log.info("reboot caculate spead success !!! ")
-
-    def updateStrategy(self, data):
-        # 先停止交易,更新完成后再执行交易
-        self.strategyStatus = False
-
-        self.cfg.write_strategy(data)
-
-        with self.lock:
-            self.strategyConfig = data
-        for order  in self.OrdersDict.values():
-            if order.status < 4 and order.status>0:
-                self.OrdersDict[order.entrustNo].closeSpread = util.get_caculate_close_spread(order.realOpenSpread, self.strategyConfig["base"]["startSpread"], self.strategyConfig["base"]["rangeSpread"])
-
-        self.strategyStatus = True
-        log.info("strategy update success: {}".format(self.strategyConfig))
 
     def runStrategy(self):
         # self.ctpmdApi.runSubMarket()
@@ -575,11 +634,6 @@ class Server:
 
             topic,rspCtpMarket = self.zmqCtpMarket.get_data()
             # log.debug("!!!!!!!!!!!!!!!!  ctp market:{}".format(rspCtpMarket.market))
-
-            is_trade_time = util.check_is_trade_time(self.strategyConfig["base"]["stopDate"],self.strategyConfig["base"]["stopTime"],self.strategyConfig["base"]["stopDateTime"])
-            if is_trade_time is False:
-                log.debug("!!!!!!!!!!!!!!! check time,stopDate:{} ,stopTime:{} ,stopDateTime:{} not trade ".format(self.strategyConfig["base"]["stopDate"],self.strategyConfig["base"]["stopTime"],self.strategyConfig["base"]["stopDateTime"]))
-                continue
             if self.strategyStatus:
                 ctpMarket=rspCtpMarket.market
                 b, t = util.check_time_is_valid(ctpMarket.updateTime)
@@ -587,25 +641,48 @@ class Server:
                     log.info("this ctp market is not valid,current time is {} ,market time is {}".format(t, ctpMarket.updateTime))
                     continue
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future1 = executor.submit(util.mt5_api_get_tick_price_from_symbol,self.zmqXAUClient, self.strategyConfig["op2"]['symbol'])
-                    future2 = executor.submit(util.mt5_api_get_tick_price_from_symbol,self.zmqUSDClient, self.strategyConfig["op3"]["symbol"])
+                    future1 = executor.submit(util.mt5_api_get_tick_price_from_symbol,self.zmqXAUClient, self.strategyConfig["LONG"]["op2"]['symbol'])
+                    future2 = executor.submit(util.mt5_api_get_tick_price_from_symbol,self.zmqUSDClient, self.strategyConfig["LONG"]["op3"]["symbol"])
                     success,rsp_XAUUSDm = future1.result()
                     success,rsp_USDCNHm = future2.result()
                 # success,rsp_XAUUSDm = util.mt5_api_get_tick_price_from_symbol(self.zmqXAUClient, self.strategyConfig["op2"]['symbol'])
-                self.check_send_status(success and rsp_XAUUSDm.req_success,rsp_XAUUSDm, "mt5 {} qry tick".format(self.strategyConfig["op2"]['symbol']))
+                self.check_send_status(success and rsp_XAUUSDm.req_success,rsp_XAUUSDm, "mt5 {} qry tick".format(self.strategyConfig["LONG"]["op2"]['symbol']))
 
                 # success,rsp_USDCNHm = util.mt5_api_get_tick_price_from_symbol(self.zmqUSDClient, self.strategyConfig["op3"]["symbol"])
-                self.check_send_status(success and rsp_USDCNHm.req_success, rsp_USDCNHm,"mt5 {} qry tick".format(self.strategyConfig["op3"]['symbol']))
+                self.check_send_status(success and rsp_USDCNHm.req_success, rsp_USDCNHm,"mt5 {} qry tick".format(self.strategyConfig["LONG"]["op3"]['symbol']))
                 log.info("get market ctp:{} ,mt5-XAUUSDm:{} ,mt5-USDCNHm:{}".format(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market))
 
-                self.checkShouldCloseOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market)
-                self.checkShouldOpenOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market)
+                strategy_long = self.get_longshort_strategy(comm.ACTION_LONG)
+                strategy_short = self.get_longshort_strategy(comm.ACTION_SHORT)
+
+                log.info("strategy LONG is {}".format(strategy_long["base"]["isRun"]))
+                if strategy_long["base"]["isRun"]:
+                    is_trade_time = util.check_is_trade_time(strategy_long["base"]["stopDate"], strategy_long["base"]["stopDateTime"])
+                    if is_trade_time is False:
+                        log.debug("!!!!!!!!!!!!!!! check time,stopDate:{} ,stopTime:{} ,stopDateTime:{} not trade ".format(strategy_long["base"]["stopDate"], strategy_long["base"]["stopTime"], strategy_long["base"]["stopDateTime"]))
+                        continue
+
+                    self.checkShouldCloseOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market ,strategy_long)
+                    self.checkShouldOpenOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market,strategy_long)
+
+                log.info("strategy SHORT is {}".format(strategy_short["base"]["isRun"]))
+                if strategy_short["base"]["isRun"]:
+
+                    is_trade_time = util.check_is_trade_time(strategy_short["base"]["stopDate"], strategy_short["base"]["stopDateTime"])
+                    if is_trade_time is False:
+                        log.debug("!!!!!!!!!!!!!!! check time,stopDate:{} ,stopDateTime:{} not trade ".format(strategy_short["base"]["stopDate"], strategy_short["base"]["stopDateTime"]))
+                        continue
+
+                    self.checkShouldCloseOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market,strategy_short)
+                    self.checkShouldOpenOrder(ctpMarket, rsp_XAUUSDm.market, rsp_USDCNHm.market,strategy_short)
+
+
 
     def runApi(self):
 
-        if not self.thread or not self.thread.is_alive():
-            self.thread = threading.Thread(target=self.runStrategy)
-            self.thread.start()
+        if not self.long_thread or not self.long_thread.is_alive():
+            self.long_thread = threading.Thread(target=self.runStrategy)
+            self.long_thread.start()
         self.loadOrdersFromDB()
         self.addOrder()
         self.cacluAddOrderSpread()

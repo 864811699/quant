@@ -32,6 +32,11 @@ pyinstaller --clean --onefile ^
   --add-data "src\ctp\_thostmduserapi.pyd;." ^
   --add-data "src\ctp\_thosttraderapi.pyd;." ^
   --exclude-module __pycache__ ^
+  --exclude-module tkinter ^
+  --exclude-module numpy ^
+  --exclude-module pandas ^
+  --exclude-module matplotlib ^
+  --exclude-module PIL ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
   --hidden-import=toml ^
@@ -47,7 +52,6 @@ pyinstaller --clean --onefile ^
   --hidden-import=zmq ^
   --hidden-import=uuid ^
   --hidden-import=sqlalchemy ^
-  --hidden-import=MetaTrader5 ^
   --hidden-import=threading ^
   --name %app_name% ^
   %py_name%

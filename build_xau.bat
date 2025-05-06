@@ -4,10 +4,10 @@ set app_name=xau.exe
 set conda_env=D:\app\anaconda3
 set py_name=bin\runMT5XAUUSD.py
 
-REM ¼¤»îÐéÄâ»·¾³
+REM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½â»·ï¿½ï¿½
 call %conda_env%\Scripts\activate.bat mt5
 
-REM ÇåÀíÖ®Ç°µÄ´ò°üÎÄ¼þ
+REM ï¿½ï¿½ï¿½ï¿½Ö®Ç°ï¿½Ä´ï¿½ï¿½ï¿½Ä¼ï¿½
 echo Cleaning previous builds...
 
 rmdir /S /Q dist
@@ -18,13 +18,17 @@ del run\*.con
 del run\*.log
 del run\%app_name%
 
-REM Ö´ÐÐ PyInstaller ´ò°ü
+REM Ö´ï¿½ï¿½ PyInstaller ï¿½ï¿½ï¿½
 echo Starting build...
 pyinstaller --clean --onefile ^
   --paths=%conda_env%\envs\mt5\Lib\site-packages ^
   --add-data "src/mt5;src/mt5" ^
   --add-data "package;package" ^
   --exclude-module __pycache__ ^
+  --exclude-module tkinter ^
+  --exclude-module pandas ^
+  --exclude-module matplotlib ^
+  --exclude-module PIL ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
   --hidden-import=toml ^
@@ -38,14 +42,15 @@ pyinstaller --clean --onefile ^
   --hidden-import=sqlalchemy ^
   --hidden-import=MetaTrader5 ^
   --hidden-import=threading ^
+  --hidden-import=numpy ^
   --name %app_name% ^
   %py_name%
 
-REM ¼ì²é´ò°ü½á¹û
+REM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 echo Build finished. Checking package content...
 :: pyi-archive_viewer dist/run.exe
 
-REM ´ò°üÍê³É
+REM ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 move /Y dist\%app_name% run\%app_name%
 
 rmdir /S /Q dist
