@@ -6,7 +6,12 @@ from package.zmq import models
 class dbServer:
     def __init__(self, cfg):
         self.cfg = cfg
-        self.engine = self._create_engine()
+        self.accountTab = 'accountInfo'
+        try:
+            self.engine = self._create_engine()
+        except Exception as e:
+            print(f"[DB INIT ERROR] 数据库连接初始化失败: {e}")
+            self.engine = None  # 或者 raise 异常，取决于你想中断程序还是继续
     def _create_engine(self):
         user = self.cfg['user']
         pwd = self.cfg['pwd']
@@ -18,6 +23,21 @@ class dbServer:
         return engine
     def get_db(self):
         return self.engine
+    def create_account_table(self):
+        dest = self.get_db()
+        schema = """
+            CREATE TABLE IF NOT EXISTS `{}` (
+            `account` VARCHAR(36) PRIMARY KEY COMMENT '资金账户',
+            `name`  varchar(30) NOT NULL COMMENT '账户名',
+            `margin_level`  float DEFAULT 0 COMMENT '预付款维持比率',
+            `equity`  float DEFAULT 0 COMMENT '净值',
+            `margin_free` float DEFAULT 0  COMMENT '可用资金',
+            `updateTime` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+            ) ENGINE=INNODB DEFAULT CHARSET=utf8;
+        """.format(self.accountTab)
+        with dest.connect() as connection:
+            res = connection.execute(text(schema))
+        return res
 
     def create_child_table(self):
         dest = self.get_db()
@@ -80,6 +100,8 @@ class dbServer:
             `askCtpQty`    int unsigned NOT  NULL  COMMENT '期货 委托量',
             `askMt51Qty`    float  NOT  NULL  COMMENT '伦敦金 委托量',
             `askMt52Qty`    float  NOT  NULL  COMMENT '汇率 委托量',
+            `fixedCloseSpread`    BOOL DEFAULT 0  COMMENT '是自定义平仓点差',
+            `is_manual`    BOOL DEFAULT 0  COMMENT '1手动委托/ 0 策略委托',
             primary key (id),
             UNIQUE KEY `uuid_UNIQUE` (`uuid`),
             KEY `entrustNo` (`entrustNo`),
@@ -133,7 +155,9 @@ class dbServer:
         dest = self.get_db()
         sql = text("""
             UPDATE {}
-            SET orderSysID = :orderSysID, 
+            SET orderSysID = :orderSysID,
+                orderRef = :orderRef, 
+                pEntrustNo = :pEntrustNo, 
                 bidPrice = :bidPrice,
                 bidVol = :bidVol,
                 status = :status,
@@ -143,7 +167,9 @@ class dbServer:
         """.format(table))
         update_data = {
             "uuid": order.uuid,
+            "orderRef": order.orderRef,
             "orderSysID": order.orderSysID,
+            "pEntrustNo": order.pEntrustNo,
             "bidPrice": order.bidPrice,
             "bidVol": order.bidVol,
             "status": order.status,
@@ -162,13 +188,13 @@ class dbServer:
                 CTPAUAskPrice, CTPAUBidPrice, MT5AUAskPrice, MT5AUBidPrice, 
                 USDAskPrice, USDBidPrice, spread, realOpenSpread, 
                 closeSpread, realCloseSpread, status, created_at, closed_at,
-                askCtpQty,askMt51Qty,askMt52Qty
+                askCtpQty,askMt51Qty,askMt52Qty,fixedCloseSpread,is_manual
             ) VALUES (
                 :uuid, :entrustNo, :longShort, 
                 :CTPAUAskPrice, :CTPAUBidPrice, :MT5AUAskPrice, :MT5AUBidPrice, 
                 :USDAskPrice, :USDBidPrice, :spread, :realOpenSpread, 
                 :closeSpread, :realCloseSpread, :status, :created_at, :closed_at,
-                :askCtpQty,:askMt51Qty,:askMt52Qty
+                :askCtpQty,:askMt51Qty,:askMt52Qty,:fixedCloseSpread,:is_manual
             )
         """.format(table))
         with dest.begin() as connection:
@@ -193,6 +219,8 @@ class dbServer:
                 "askCtpQty": order.askCtpQty,
                 "askMt51Qty": order.askMt51Qty,
                 "askMt52Qty": order.askMt52Qty,
+                "fixedCloseSpread": order.fixedCloseSpread,
+                "is_manual": order.is_manual,
             })
 
         return True
@@ -206,7 +234,9 @@ class dbServer:
                 closeSpread = :closeSpread, 
                 realCloseSpread = :realCloseSpread, 
                 status = :status, 
-                closed_at = :closed_at
+                closed_at = :closed_at,
+                fixedCloseSpread = :fixedCloseSpread,
+                is_manual = :is_manual
             WHERE uuid = :uuid
         """.format(table))
         update_data = {
@@ -216,6 +246,8 @@ class dbServer:
             "realCloseSpread": order.realCloseSpread,
             "status": order.status,
             "closed_at": order.closed_at,
+            "fixedCloseSpread": order.fixedCloseSpread,
+            "is_manual": order.is_manual,
         }
         with dest.begin() as connection:
             result = connection.execute(sql, update_data)
@@ -249,6 +281,8 @@ class dbServer:
                     order.askCtpQty=row[17]
                     order.askMt51Qty=row[18]
                     order.askMt52Qty=row[19]
+                    order.fixedCloseSpread=row[20]
+                    order.is_manual=row[21]
                     orders.append(order)
         return orders
 
@@ -277,8 +311,8 @@ class dbServer:
                     order.bidVol = row[14]
                     order.status = row[15]
                     order.statusMsg = row[16]
-                    order.rspTime = row[17]
-                    order.reqTime = row[18]
+                    order.reqTime = row[17]
+                    order.rspTime = row[18]
                     orders.append(order)
         return orders
 
@@ -307,7 +341,58 @@ class dbServer:
                     order.bidPrice = row[14]
                     order.status = row[15]
                     order.statusMsg = row[16]
-                    order.rspTime = row[17]
-                    order.reqTime = row[18]
+                    order.reqTime = row[17]
+                    order.rspTime = row[18]
                     orders.append(order)
         return orders
+
+    def get_max_id(self,table):
+        dest = self.get_db()
+        with dest.begin() as connection:
+            sql = text("SELECT AUTO_INCREMENT FROM information_schema.tables WHERE table_name = '{}' AND table_schema = DATABASE()".format(table))
+            result = connection.execute(sql).fetchone()
+            if result is None or result[0] is None:
+                return 1
+            else:
+                return result[0]
+    def clear_table(self,table):
+        dest = self.get_db()
+        try:
+            with dest.begin() as connection:
+                connection.execute(text(f"DELETE FROM {table}"))
+                return True,""
+        except Exception as e:
+            return False,str(e)
+    def upsert_account(self,accountInfo):
+        dest = self.get_db()
+        sql = text("""  
+            INSERT INTO {} (
+                    account, name, margin_level, equity, margin_free
+                ) VALUES (
+                    :account, :name, :margin_level, :equity, :margin_free
+                )
+            ON DUPLICATE KEY UPDATE
+                name = VALUES(name),
+                margin_level = VALUES(margin_level),
+                equity = VALUES(equity),
+                margin_free = VALUES(margin_free);
+            """.format(self.accountTab))
+        param = {"account": accountInfo.account, "name": accountInfo.name, "margin_level": accountInfo.margin_level, "equity": accountInfo.equity, "margin_free": accountInfo.margin_free}
+        with dest.begin() as connection:
+            connection.execute(sql, param)
+    def read_accountInfo(self):
+        dest = self.get_db()
+        account_dict = {}
+        with dest.begin() as connection:
+            sql = text("SELECT * FROM {}".format(self.accountTab))
+            rows = connection.execute(sql).fetchall()
+            if rows is not None and len(rows) > 0:
+                for row in rows:
+                    account_info = models.AccountInfo()
+                    account_info.account=row[0]
+                    account_info.name=row[1]
+                    account_info.margin_level=row[2]
+                    account_info.equity=row[3]
+                    account_info.margin_free=row[4]
+                    account_dict[row[0]]=account_info
+        return account_dict

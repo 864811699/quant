@@ -1,5 +1,5 @@
 @echo off
-
+cd /d "%~dp0"
 set app_name=core.exe
 set conda_env=D:\app\anaconda3
 set py_name=bin\runCore.py
@@ -23,6 +23,7 @@ REM Ö´ÐÐ PyInstaller ´ò°ü
 echo Starting build...
 pyinstaller --clean --onefile ^
   --paths=%conda_env%\envs\mt5\Lib\site-packages ^
+  --additional-hooks-dir=hooks ^
   --add-data "src/core;src/core" ^
   --add-data "templates;templates" ^
   --add-data "package;package" ^
@@ -32,6 +33,7 @@ pyinstaller --clean --onefile ^
   --exclude-module pandas ^
   --exclude-module matplotlib ^
   --exclude-module PIL ^
+  --exclude-module eventlet ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
   --hidden-import=toml ^
@@ -47,8 +49,15 @@ pyinstaller --clean --onefile ^
   --hidden-import=winsound ^
   --hidden-import=requests ^
   --hidden-import=flask_restful ^
+  --hidden-import=flask_restful.reqparse ^
   --hidden-import=flask ^
+  --hidden-import=flask_sqlalchemy ^
+  --hidden-import=flask_socketio ^
+  --hidden-import=socketio.async_drivers.threading ^
+  --hidden-import=engineio.async_drivers.threading ^
   --hidden-import=concurrent ^
+  --hidden-import=queue ^
+  --hidden-import=shelve ^
   --name %app_name% ^
   %py_name%
 

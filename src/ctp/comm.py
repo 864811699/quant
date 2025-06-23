@@ -1,14 +1,14 @@
-from dataclasses import dataclass, field,asdict
+from dataclasses import dataclass, field
 import thosttraderapi as tdapi
-from datetime import datetime
-import json
+from datetime import datetime, time, timedelta
+
 
 from package.zmq import models
 
-OFFSET_OPEN = tdapi.THOST_FTDC_OFEN_Open
-OFFSET_CLOSE = tdapi.THOST_FTDC_OFEN_Close
-OFFSET_CLOSE_TODAY = tdapi.THOST_FTDC_OFEN_CloseToday
-OFFSET_CLOSE_PREV = tdapi.THOST_FTDC_OFEN_CloseYesterday
+OFFSET_OPEN = tdapi.THOST_FTDC_OFEN_Open    # 0
+OFFSET_CLOSE = tdapi.THOST_FTDC_OFEN_Close  # 1
+OFFSET_CLOSE_TODAY = tdapi.THOST_FTDC_OFEN_CloseToday   # 3
+OFFSET_CLOSE_PREV = tdapi.THOST_FTDC_OFEN_CloseYesterday    # 4
 
 ZMQ_TO_CTP_OPEN_CLOSE={"OPEN":OFFSET_OPEN, "CLOSE":OFFSET_CLOSE}
 CTP_TO_ZMQ_OPEN_CLOSE = {OFFSET_OPEN: "OPEN", OFFSET_CLOSE: "CLOSE",OFFSET_CLOSE_TODAY:"CLOSE",OFFSET_CLOSE_PREV:"CLOSE"}
@@ -53,10 +53,11 @@ MARKET_TRADINGDAY = 'TradingDay'
 SEARCH_RESULT = 'SearchResult'
 
 ErrorCodeDict = {0: "成功",
-                 -1: "表示网络连接失败",
-                 -2: "表示未处理请求超过许可数",
-                 -3: "表示每秒发送请求数超过许可数"
-                 }
+                 -1: "网络连接失败",
+                 -2: "未处理请求超过许可数",
+                 -3: "每秒发送请求数超过许可数",
+                 -100: "未找到撤单委托号"
+}
 
 """
 ///全部成交
@@ -79,12 +80,16 @@ ErrorCodeDict = {0: "成功",
 #define THOST_FTDC_OST_Touched 'c'
 
 """
+ORDER_NEW=1
+ORDER_PENDING_CLOSE=2
+ORDER_CLOSED=3
 
 #  0     1    2    4    5   6
 # 未知, 已报,未完成,已撤,已成,废单
 ORDER_STATUS_UNKNOWN = 0
 NEW_ORDER = 1
 PARTTRADE = 2
+PENDING_CANCELED=3
 AllTrade = 4
 CANCELED = 5
 REJECTED = 6
@@ -99,6 +104,12 @@ STATUS_DICT = {
     '0': 4,
     '5': 5,
     '-1': 6,
+    0:0,
+    1:1,
+    2:2,
+    4:4,
+    5:5,
+    6:6,
 }
 
 
@@ -168,3 +179,10 @@ class OrderTrade:
 
 def create_symbol_position_detail():
     return {ACTION_LONG:{POSITION_TODAY:0,POSITION_YESTERDAY:0},ACTION_SHORT:{POSITION_TODAY:0,POSITION_YESTERDAY:0}}
+def is_today_position(open_time: datetime, now: datetime = None) -> bool:
+    now = now or datetime.now()
+    if now.time() >= time(21, 0):
+        trading_day_start = datetime.combine(now.date(), time(21, 0)) - timedelta(days=0)
+    else:
+        trading_day_start = datetime.combine(now.date(), time(21, 0)) - timedelta(days=1)
+    return open_time >= trading_day_start

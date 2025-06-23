@@ -48,6 +48,8 @@ class POrder:
     askCtpQty: int =0
     askMt51Qty: float =0.0
     askMt52Qty:float =0.0
+    fixedCloseSpread:bool=False
+    is_manual: bool=False  # 1手动委托/ 0 策略委托
 
 
 
@@ -67,7 +69,7 @@ class Order:
     askPrice: float = 0.0
     parentAskQty:float=0.0
     askQty: float = 0.0
-    orderSysID: int = 0  # order=390411490  查询用
+    orderSysID: str = ""  # order=390411490  查询用
     bidVol: float = 0.0
     bidPrice: float = 0.0
     status: int = 0
@@ -111,6 +113,10 @@ REQ_ORDER = "O"
 REQ_MARKET = "M"
 REQ_SEARCH = "S"
 REQ_LIQUIDATE = "L"
+REQ_CLEAR = "C"
+REQ_UPDATE = "U"
+REQ_RECONNECT = "R"  # 重新链接
+REQ_MOVE_ORDER = "MO" # 移动订单到新母单
 
 @dataclass
 class Request:
@@ -120,6 +126,8 @@ class Request:
     openClose: str = ""
     pid: int = 0
     volume: float = 0.0
+    pid_old:int = 0
+    closedOrders:List[int]=field(default_factory=list)
     def to_json(self):
         return json.dumps(asdict(self), default=custom_json_encoder, indent=4, ensure_ascii=False)
 
@@ -137,6 +145,19 @@ class Response:
         return json.dumps(asdict(self), default=custom_json_encoder, indent=4, ensure_ascii=False)
 
 
+XAUUSD="XAUUSD"
+USDCNH="USDCNH"
+CTP_AU="CTP_AU"
+@dataclass
+class AccountInfo:
+    account: str = ""
+    name: str = ""
+    symbol: str = "" #XAUUSD /USDCNH/CTP_AU
+    margin_level:float=0.0
+    equity:float=0.0
+    margin_free:float=0.0
+    def to_json(self):
+        return json.dumps(asdict(self), default=custom_json_encoder, indent=4, ensure_ascii=False)
 # 自定义解码器，用于将字典转换为对应的类实例
 def custom_json_decoder(dct):
     # 判断字段来选择转换的类
@@ -162,6 +183,8 @@ def custom_json_decoder(dct):
         # 返回一个 Response 对象
         return Response(req_success=dct.get('req_success', False), errmsg=dct.get('errmsg', ""), order=order, orders=orders, positions=positions, market=market)
 
+    if 'margin_level' in dct:
+        return AccountInfo(account=dct.get('account', ""),name=dct.get('name', ""),symbol=dct.get('symbol', ""),margin_level=dct.get('margin_level', 0.0),equity=dct.get('equity',  0.0),margin_free=dct.get('margin_free',  0.0))
     # 处理 datetime 字段
     for key, value in dct.items():
         if isinstance(value, str):

@@ -3,11 +3,14 @@ import zmq
 class ZmqPublisher:
     """ ZeroMQ PUB 端（发布者）封装 """
 
-    def __init__(self, address="tcp://127.0.0.1:5555",topic="market"):
+    def __init__(self, address="tcp://127.0.0.1:5555",topic="market",is_proxy=False):
         self.address = address
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUB)
-        self.socket.bind(self.address)
+        if is_proxy:
+            self.socket.connect(self.address)
+        else:
+            self.socket.bind(self.address)
         self.topic =topic
 
     def publish(self,  message: str):

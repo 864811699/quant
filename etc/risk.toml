@@ -1,0 +1,13 @@
+spread_safety_range = [ 100, 4000,]   # 点差区间
+xau_margin_level = 0                # 伦敦金账户担保比例
+xau_margin_level_stop_trade = 0     # 伦敦金账户担保比例
+usd_margin_level = 0                # 汇率 账户担保比例
+usd_margin_level_stop_trade = 0     # 汇率 账户担保比例
+xau_equity = 0                      # 伦敦金账户净值
+usd_equity = 10                     # 汇率 账户净值
+ctp_margin_free = 100               # CTP 可用资金低于X 报警
+ctp_margin_free_stop_trade = 500    # CTP 可用资金低于X 停止交易
+usd_price_safety_range = [ 7.15, 7.36,] # 汇率的价格区间
+xau_price_safety_range = [ 3000, 3300,] # 伦敦金的价格区间
+xau_volatility_time = 2                 # 伦敦金 波动测算的秒数
+xau_volatility_price = 10          # 伦敦金 波动幅度

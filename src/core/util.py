@@ -11,9 +11,14 @@ log = logging.getLogger('root')
 
 
 
-def get_caculate_close_spread(open_spread,base_spread,range_spread):
-    # 平仓逻辑为 逼近基准点差时平仓
-    return open_spread-range_spread if open_spread>base_spread else open_spread+range_spread
+def get_caculate_close_spread(open_spread,longshort,close_spread):
+    # 平多  开仓点差+平仓点差
+    # 平空  开仓点差-平仓点差
+    if longshort==comm.ACTION_LONG:
+        return open_spread+close_spread
+    else:
+        return open_spread-close_spread
+
 
 
 def get_caculate_spread_from_price(ctpP, mt5P, rateP):
@@ -25,15 +30,15 @@ def get_caculate_spread_from_price(ctpP, mt5P, rateP):
 def get_caculate_spread(ctpP, mt5P, rateP, action):
     # 计算点差值
     if action == comm.ACTION_LONG:
-        return get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
-    else:
         return get_caculate_spread_from_price(ctpP.askPrice1,mt5P.bidPrice1,rateP.bidPrice1)
+    else:
+        return get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
 
 def get_caculate_long_short_spread(ctpP, mt5P, rateP):
     # 计算点差值 多,空
-    long_spread = get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
-    short_spread = get_caculate_spread_from_price(ctpP.askPrice1,mt5P.bidPrice1,rateP.bidPrice1)
-    return long_spread,short_spread
+    long_spread = get_caculate_spread_from_price(ctpP.askPrice1,mt5P.bidPrice1,rateP.bidPrice1)
+    short_spread = get_caculate_spread_from_price(ctpP.bidPrice1,mt5P.askPrice1,rateP.askPrice1)
+    return round(long_spread,2),round(short_spread,2)
 
 
 #______________________________________________________________________________________
@@ -83,7 +88,8 @@ def should_close_order(ctpP, mt5P, rateP, pOrder):
     # 是否需要平仓
     # 当前点差<=平仓点差  平空
     # 当前点差>=平仓点差  平多
-    spread = get_caculate_spread(ctpP, mt5P, rateP, pOrder.longShort)
+    longshort= comm.ACTION_LONG if pOrder.longShort==comm.ACTION_SHORT else comm.ACTION_SHORT
+    spread = get_caculate_spread(ctpP, mt5P, rateP, longshort)
     if pOrder.longShort == comm.ACTION_SHORT and pOrder.closeSpread >= spread:
         return True, spread
     if pOrder.longShort == comm.ACTION_LONG and pOrder.closeSpread <= spread:
@@ -102,11 +108,11 @@ def time_is_trade_time(now):
     """判断当前是否是上期所黄金交易时间（含夜盘）"""
     # 交易时间段定义
     sessions = [
-        (time(9, 0,5), time(10, 14,40)),   # 白盘上午
-        (time(10, 15,5), time(11, 29,40)),   # 白盘上午
-        (time(13, 30,5), time(14, 59,40)),  # 白盘下午
+        (time(9, 0,5), time(10, 14,58)),   # 白盘上午
+        (time(10, 15,5), time(11, 29,58)),   # 白盘上午
+        (time(13, 30,5), time(14, 59,58)),  # 白盘下午
         (time(21, 0,5), time(23, 59, 59)), # 夜盘当天
-        (time(0, 0,0), time(2, 29,40))     # 夜盘次日凌晨
+        (time(0, 0,0), time(2, 29,58))     # 夜盘次日凌晨
     ]
 
     now_time = now.time()
@@ -180,6 +186,12 @@ def sed_close_all_to_server(c,symbol,pid):
     success, response = c.request(message=msg)
     return success, response
 
+def send_clear_all_data_to_server(c):
+    order = models.Request()
+    order.request_type = models.REQ_CLEAR
+    msg = order.to_json()
+    success, response = c.request(message=msg)
+    return success, response
 
 def mt5_api_get_tick_price_from_symbol(c,symbol):
     order = models.Request()
@@ -188,7 +200,20 @@ def mt5_api_get_tick_price_from_symbol(c,symbol):
     msg = order.to_json()
     success, response = c.request(message=msg)
     return success, response
+def send_closed_pid_orders_to_server(c,pids):
+    order = models.Request()
+    order.request_type = models.REQ_UPDATE
+    order.closedOrders=pids
+    msg = order.to_json()
+    success, response = c.request(message=msg)
+    return success, response
 
+def send_reconnect_mt5_to_client(c):
+    order = models.Request()
+    order.request_type = models.REQ_RECONNECT
+    msg = order.to_json()
+    success, response = c.request(message=msg)
+    return success, response
 
 def float_equal(a, b, tol=1e-4):
     return abs(a - b) <= tol
@@ -231,11 +256,6 @@ def get_err_orders(c,porder,parent_ask_qty,symbol,longshort,status):
 
     return success,rsp.orders,error_orders
 
-def get_porder_status_from_child_order(orders):
-    status=comm.PARENT_STATUS_UNKWON
-
-
-    return status
 
 def get_porder_openclose_from_ctp(c,porder):
     # 母单是否开平仓以CTP是否开平仓为依据,所以CTP不用补单
@@ -250,3 +270,34 @@ def get_porder_openclose_from_ctp(c,porder):
     else:
         status=comm.PARENT_STATUS_CLOSE_CTP
     return success,rsp.orders,status
+def get_child_order_from_child_by_pid(c,pid):
+    # 母单是否开平仓以CTP是否开平仓为依据,所以CTP不用补单
+    status = comm.PARENT_STATUS_UNKWON
+    success, rsp = qry_child_order_from_pid(c, pid)
+    if not success:
+        return success, rsp, status
+    if len(rsp.orders)==0:
+        status=comm.PARENT_STATUS_OPEN_FAIL
+    elif len(rsp.orders)==1:
+        status=comm.PARENT_STATUS_OPEN_CTP
+    else:
+        status=comm.PARENT_STATUS_CLOSE_CTP
+    return success, rsp.orders, status
+def get_child_order_from_mt5(c,entrustNo,openclose):
+    success, rsp = qry_child_order_from_pid(c, entrustNo)
+    if not success:
+        return success,rsp
+    if len(rsp.orders) != 0:
+        for v in rsp.orders:
+            if v.openClose == openclose:
+                return success,v
+    elif len(rsp.orders) == 0:
+        return success,models.Order()
+def send_req_move_order_to_new_order_for_child(c,entrustNo_old,entrustNo_new):
+    order = models.Request()
+    order.request_type = models.REQ_MOVE_ORDER
+    order.pid=entrustNo_new
+    order.pid_old=entrustNo_old
+    msg = order.to_json()
+    success, response = c.request(message=msg)
+    return success, response

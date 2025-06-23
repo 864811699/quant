@@ -71,7 +71,9 @@ class CMdImpl(mdapi.CThostFtdcMdSpi):
 
     def OnRtnDepthMarketData(self, pDepthMarketData: 'CThostFtdcDepthMarketDataField') -> "void":
         # 行情推送
-        # log.info(f"ctp md time:{pDepthMarketData.UpdateTime} - {pDepthMarketData.InstrumentID} - bidPrice:{pDepthMarketData.BidPrice1} - bidVol:{pDepthMarketData.BidVolume1}- askPrice:{pDepthMarketData.AskPrice1}  - askVol:{pDepthMarketData.AskVolume1} ")
+        if pDepthMarketData.BidPrice1>100000 or pDepthMarketData.BidPrice1<-100000 or pDepthMarketData.AskPrice1>100000 or pDepthMarketData.AskPrice1<-100000:
+            log.info(f"ctp md time:{pDepthMarketData.UpdateTime} - {pDepthMarketData.InstrumentID} - bidPrice:{pDepthMarketData.BidPrice1} - bidVol:{pDepthMarketData.BidVolume1}- askPrice:{pDepthMarketData.AskPrice1}  - askVol:{pDepthMarketData.AskVolume1} ")
+            return
         rsp=models.Response()
         ctpmd=models.Market()
         ctpmd.instrumentID=pDepthMarketData.InstrumentID

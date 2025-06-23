@@ -1,5 +1,5 @@
 @echo off
-
+cd /d "%~dp0"
 set app_name=ctp.exe
 set conda_env=D:\app\anaconda3
 set py_name=bin\runCTP.py

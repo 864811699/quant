@@ -1,6 +1,8 @@
 from logging.handlers import RotatingFileHandler
 import logging
 import datetime as dt
+import sys
+import threading
 
 def setup_logger(filename):
     today = dt.datetime.today().strftime('%Y%m%d')
@@ -26,4 +28,10 @@ def setup_logger(filename):
 
     log.addHandler(console_handler)
     log.addHandler(file_log_handler)
+    def log_uncaught_exception(exctype, value, tb):
+        log.error("Uncaught exception", exc_info=(exctype, value, tb))
+    sys.excepthook = log_uncaught_exception
+    def thread_exception_handler(args):
+        log.error("Unhandled thread exception", exc_info=(args.exc_type, args.exc_value, args.exc_traceback))
+    threading.excepthook = thread_exception_handler
     return log

@@ -6,8 +6,7 @@ if __name__ == '__main__':
     multiprocessing.freeze_support()  # 关键代码：防止多进程重复执行
 
     import datetime as dt
-    import os
-    import sys
+    import os,sys
 
     pwd = os.path.dirname(os.path.realpath(__file__))
     sys.path.insert(0, pwd + '/../')
@@ -21,8 +20,10 @@ if __name__ == '__main__':
     now = dt.datetime.now()
     print("\n\n\n-" + "-" * 80)
     print("{}  running ... ".format(now))
-    s = server.Server("../etc/server.toml", "../etc/strategy.toml")
+    s = server.Server("../etc/server.toml", "../etc/strategy.toml","../etc/risk.toml")
     s.init_api()
     s.runApi()
-    app = app.create_app(s)
-    app.run(host=s.webConfig["host"], port=s.webConfig["port"], debug=False)
+    socketio,appServer = app.create_app(s)
+    app.restart_edge(f"http://{s.webConfig['host']}:{s.webConfig['port']}")
+    socketio.run(appServer,host=s.webConfig["host"], port=s.webConfig["port"], debug=False,allow_unsafe_werkzeug=True)
+    # app.run(host=s.webConfig["host"], port=s.webConfig["port"], debug=False)

@@ -1,59 +1,51 @@
 @echo off
 cd /d "%~dp0"
-set app_name=usd.exe
+set app_name=monitor.exe
 set conda_env=D:\app\anaconda3
-set py_name=bin\runMT5USDCNH.py
+set py_name=script\monitor.py
 
-set myenv=build_mt5
-REM æ¿€æ´»è™šæ‹Ÿç¯å¢ƒ
-call %conda_env%\Scripts\activate.bat %myenv%
+REM ¼¤»îĞéÄâ»·¾³
+call %conda_env%\Scripts\activate.bat mt5
 
-REM Ã‡Ã¥Ã€Ã­Ã–Â®Ã‡Â°ÂµÃ„Â´Ã²Â°Ã¼ÃÃ„Â¼Ã¾
+REM ÇåÀíÖ®Ç°µÄ´ò°üÎÄ¼ş
 echo Cleaning previous builds...
 
 rmdir /S /Q dist
 rmdir /S /Q build
 mkdir run
+
 del run.spec
 del run\*.con
 del run\*.log
 del run\%app_name%
 
-REM Ã–Â´ÃÃ PyInstaller Â´Ã²Â°Ã¼
+REM Ö´ĞĞ PyInstaller ´ò°ü
 echo Starting build...
 pyinstaller --clean --onefile ^
   --paths=%CONDA_PREFIX%\Lib\site-packages ^
-  --add-data "src/mt5;src/mt5" ^
-  --add-data "package/config;package/config" ^
   --add-data "package/db;package/db" ^
-  --add-data "package/logger;package/logger" ^
   --add-data "package/zmq;package/zmq" ^
   --exclude-module __pycache__ ^
-  --hidden-import=logging ^
-  --hidden-import=logging.handlers ^
-  --hidden-import=toml ^
   --hidden-import=dataclasses ^
-  --hidden-import=multiprocessing ^
   --hidden-import=json ^
-  --hidden-import=zmq ^
-  --hidden-import=uuid ^
   --hidden-import=sqlalchemy ^
   --hidden-import=pymysql ^
   --hidden-import=sqlalchemy.dialects.mysql.pymysql ^
-  --hidden-import=MetaTrader5 ^
   --hidden-import=threading ^
+  --hidden-import=winsound ^
+  --hidden-import=requests ^
   --name %app_name% ^
   %py_name%
 
-REM Â¼Ã¬Â²Ã©Â´Ã²Â°Ã¼Â½Ã¡Â¹Ã»
+REM ¼ì²é´ò°ü½á¹û
 echo Build finished. Checking package content...
 :: pyi-archive_viewer dist/run.exe
 
-REM Â´Ã²Â°Ã¼ÃÃªÂ³Ã‰
+REM ´ò°üÍê³É
 move /Y dist\%app_name% run\%app_name%
 
 rmdir /S /Q dist
 rmdir /S /Q build
-del *.spec
+
 echo "All done! Executable created in dist/%app_name%"
 pause

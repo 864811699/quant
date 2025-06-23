@@ -2,46 +2,120 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
+  <link rel="icon" href="data:,">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>更新策略</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
         .main-container {
-          display: flex;
-          justify-content: flex-start;
-          padding: 20px;
+          display: grid;
+          grid-template-columns: 340px 1fr 340px; /* 三列布局 */
+          grid-template-rows: 160px auto; /* 两行布局 */
+          grid-template-areas:
+          "left top right"
+          "left bottom right"; /* 定义网格区域 */
+          padding: 8px;
           background-color: #f8f8f8;
         }
-
         .left-column {
-          width: 440px;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-        .right-column {
-          width: 440px;
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-          margin-left: auto; /* 关键右对齐属性 */
+          grid-area: left; /* 绑定左侧区域 */
         }
 
-        .config-section {
-          background-color: white;
+        .right-column {
+          grid-area: right; /* 绑定右侧区域 */
+        }
+
+        .center-top {
+          grid-area: top; /* 绑定中间上部区域 */
+        }
+        .datetime-input {
+          width: 80px;
+        }
+        .number-input {
+          width: 60px;
+        }
+
+        .center-bottom {
+          grid-area: bottom; /* 绑定中间下部区域 */
+          background: white;
           padding: 8px;
           border-radius: 8px;
           box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+          /*max-height: 90vh;*/
+          overflow: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+
+        #orderTable {
+          flex: 1;
+          min-width: 800px;
+          overflow-y: auto;
+
+          th, td {
+            padding: 2px;
+            text-align: center;
+            white-space: nowrap;
+          }
+
+          th:first-child { width: 50px; }
+          td:last-child { min-width: 100px; }
+        }
+
+        .submit-btn {
+          margin-top: 1px;
+          align-self: flex-end;
+          background: #007bff;
+          color: white;
+        }
+        .submit-btn2 {
+          margin-top: 1px;
+          align-self: flex-end;
+          background: red;
+          color: white;
+        }
+
+        .left-column {
+          width: 340px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+        .right-column {
+          width: 340px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .config-section {
+
+          background-color: white;
+          padding: 2px;
+          border-radius: 2px;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          align-items: center;
+
         }
 
         table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 10px;
+          margin-top: 0;
+        }
+        h3 {
+          margin-top: 1px;     /* 缩小上边距 */
+          margin-bottom: 1px;  /* 缩小下边距 */
         }
 
         table, th, td {
           border: 1px solid #ccc;
-          padding: 6px;
+          height: 40px;
+          padding: 0;
         }
 
         caption {
@@ -54,6 +128,36 @@
           margin-top: 10px;
           padding: 6px 12px;
         }
+        #market {
+          margin: 0 auto;              /* 居中整个表格 */
+          border-collapse: collapse;
+          table-layout: fixed;
+          width: 80%;                  /* 可根据需要调整宽度 */
+          height: 140px;
+        }
+        #market th {
+          font-size: 55px;
+          font-weight: bold;
+          padding: 3px 3px;          /* 上下增加间距 */
+          text-align: center;          /* 居中单元格内容 */
+        }
+        #long_spread {
+          text-align: left;        /* 左对齐 */
+        }
+        #short_spread {
+          text-align: right;       /* 右对齐 */
+        }
+        table input[type="text"],
+        table input[type="number"] {
+          width: 100%;
+          height: 100%;
+          font-size: 26px;
+          /*font-weight: bold;*/
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          border: none;
+        }
     </style>
 </head>
 <body>
@@ -61,22 +165,35 @@
   <div class="left-column" id="LONG">
     <!-- 策略设置模块 -->
     <section class="config-section">
-      <h3>策略设置(多)</h3>
+        <h3 >策略设置(多)</h3>
       <table>
+          <colgroup>
+            <col style="width: 40%;">
+            <col style="width: 60%;">
+          </colgroup>
         <tr><td>参数名</td><td colspan="2">数值</td></tr>
         <tr><td>基准点差</td><td colspan="2"><input type="number" id="start_spread_LONG"></td></tr>
         <tr><td>区间点差</td><td colspan="2"><input type="number" id="range_spread_LONG"></td></tr>
         <tr><td>平仓点差</td><td colspan="2"><input type="number" id="close_spread_LONG"></td></tr>
         <tr><td>最大持仓</td><td colspan="2"><input type="number" id="max_vol_LONG"></td></tr>
+        <tr><td>手动单平仓</td><td colspan="2"> <button class="submit-btn" data-follow="1" id="is_close_by_strategy_LONG" onclick="toggleFollow('LONG',this)">不跟随</button></td></tr>
         <tr><td>策略状态</td><td colspan="2" id="is_run_LONG"></td></tr>
       </table>
       <button onclick="submit_base_data('LONG')">更新策略</button>
+      <button onclick="stop_strategy('LONG')">停止策略</button>
+      <button onclick="start_strategy('LONG')">启动策略</button>
     </section>
 
 
     <section class="config-section">
       <h3>比率配置</h3>
       <table>
+        <colgroup>
+            <col style="width: 20%;">
+            <col style="width: 30%;">
+            <col style="width: 15%;">
+            <col style="width: 35%;">
+        </colgroup>
         <tr><td>平台</td><td>标的</td><td >方向</td><td>数量</td></tr>
         <tr><td>期货</td><td id="ctp_symbol_LONG"></td><td>多</td><td><input type="number" id="ctp_vol_LONG"></td></tr>
         <tr><td>MT5</td><td id="mt5_symbol1_LONG"></td><td>空</td><td><input type="number" id="mt5_vol1_LONG"></td></tr>
@@ -92,115 +209,289 @@
       <table>
         <tr><td>类型</td><td>起始</td><td>截止</td></tr>
         <tr><td>日期</td><td><input type="date"  id="date_start_LONG"></td><td><input type="date" id="date_stop_LONG"></td></tr>
-        <tr><td>日期时间</td><td><input type="datetime-local"  step="1" id="datetime_start_LONG"></td><td><input type="datetime-local" step="1" id="datetime_stop_LONG"></td></tr>
+        <tr><td>日期时间</td><td><input type="datetime-local" class="datetime-input" step="1" id="datetime_start_LONG"></td><td><input type="datetime-local" class="datetime-input" step="1" id="datetime_stop_LONG"></td></tr>
       </table>
       <button onclick="submit_time_data('LONG')">提交修改</button>
-      <button onclick="stop_strategy('LONG')">停止策略</button>
-      <button onclick="start_strategy('LONG')">启动策略</button>
+    </section>
+    <section class="config-section">
+      <h3>风控配置</h3>
+      <table>
+        <tr><td>类型</td><td>起始</td><td>截止</td></tr>
+        <tr><td>点差区间</td><td><input class="number-input" type="number" id="spread_start"></td><td><input class="number-input" type="number" id="stop_spread"></td></tr>
+        <tr><td colspan="2">XAU预付款比例%</td><td><input class="number-input" type="number" id="xau_margin_level"></td></tr>
+        <tr><td colspan="2">XAU预付款比例停交易限额%</td><td><input class="number-input" type="number" id="xau_margin_level_stop_trade"></td></tr>
+        <tr><td colspan="2">USD预付款比例%</td><td><input class="number-input" type="number" id="usd_margin_level"></td></tr>
+        <tr><td colspan="2">USD预付款比例停交易限额%</td><td><input class="number-input" type="number" id="usd_margin_level_stop_trade"></td></tr>
+        <tr><td colspan="2">XAU净值</td><td><input class="number-input" type="number" id="xau_equity"></td></tr>
+        <tr><td colspan="2">USD净值</td><td><input class="number-input" type="number" id="usd_equity"></td></tr>
+        <tr><td colspan="2">期货黄金保证金警报</td><td><input class="number-input" type="number" id="ctp_margin_free"></td></tr>
+        <tr><td colspan="2">期货黄金保证金停交易限额</td><td><input class="number-input" type="number" id="ctp_margin_free_stop_trade"></td></tr>
+        <tr><td>XAU安全价格</td><td><input class="number-input" type="number" id="xua_price_start"></td><td><input class="number-input" type="number" id="xua_price_stop"></td></tr>
+        <tr><td>USD安全价格</td><td><input class="number-input" type="number" id="usd_price_start"></td><td><input class="number-input" type="number" id="usd_price_stop"></td></tr>
+        <tr><td>XAU波动</td><td><input class="number-input" type="number" id="xau_volatility_time"></td><td><input class="number-input" type="number" id="xau_volatility_price"></td></tr>
+      </table>
+      <button onclick="submit_risk_data()">提交修改</button>
     </section>
 
     </div>
 <!--------------------------------------------------------------------------------------------------->
+  <div class="center-top">
+    <table id="market">
+        <thead>
+          <tr>
+            <th colspan="2" style="height: 60px;" id="long_spread"></th>
+            <th colspan="2" style="height: 60px;" id="short_spread"></th>
+          </tr>
+        <tr>
+          <td colspan="2" style="height: 22px; vertical-align: top; text-align: right;"><button onclick="open_order('LONG')" class="submit-btn" style="width: 95%; height: 95%;">开多仓</button></td>
+          <td colspan="2" style="height: 22px; vertical-align: top; text-align: left;"><button onclick="open_order('SHORT')" class="submit-btn" style="width: 95%; height: 95%;">开空仓</button></td>
+        </tr>
+        </thead>
+      </table>
+  </div>
+
+  <!--------------------------------------------------------------------------------------------------->
+  <div class="center-bottom">
+    <div class="config-section">
+      <div>
+        <button onclick="qry_orders(0)" class="submit-btn">查询未平仓</button>
+        <button onclick="qry_orders(1)" class="submit-btn">查询已平仓</button>
+        <button onclick="qry_error_orders()" class="submit-btn">查询缺失委托</button>
+<!--        <button onclick="exc_error_orders()" class="submit-btn">执行缺失委托</button>-->
+<!--          <button onclick="update_orders()" class="submit-btn2">删除委托</button>-->
+        <button onclick="close_orders()" class="submit-btn">平仓</button>
+      </div>
+
+      <div style="margin-left: auto; display: flex; gap: 10px">
+        <button onclick="reconnect_mt5('xau')" class="submit-btn2">伦敦金重连</button>
+        <button onclick="reconnect_mt5('usd')" class="submit-btn2">美元重连</button>
+        <button onclick="clear_positions('LONG')" class="submit-btn2">清多头</button>
+        <button onclick="clear_positions('SHORT')" class="submit-btn2">清空头</button>
+        <button onclick="clear_all_data()" class="submit-btn2">清理所有数据</button>
+      </div>
+    </div>
+      <div>
+        <table id="orderTable">
+          <thead>
+<!--          <tr>-->
+<!--            <th><input type="checkbox" id="selectAll"></th>-->
+<!--            <th>委托号</th>-->
+<!--            <th>多空</th>-->
+<!--            <th>预期点差</th>-->
+<!--            <th>实际开点差</th>-->
+<!--            <th>预期平点差</th>-->
+<!--            <th>实际平点差</th>-->
+<!--            <th>状态</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 100px;">创建时间</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 100px;">平仓时间</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 60px;">ctp委托量</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 60px;">mt5_1委托量</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 60px;">mt5_2委托量</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 60px;">是手动点差</th>-->
+<!--            <th style="white-space: normal; word-break: break-word; width: 30px;">手动平仓点差</th>-->
+<!--            <th colspan="2">平仓值操作</th>-->
+<!--            <th colspan="2">异常委托操作</th>-->
+<!--          </tr>-->
+        </thead>
+          <tbody></tbody>
+        </table>
+    </div>
+  </div>
+<!--------------------------------------------------------------------------------------------------->
   <div class="right-column" id="SHORT">
     <!-- 策略设置模块 -->
     <section class="config-section">
-      <h3>策略设置(空)</h3>
+        <h3 style="margin: 0;">策略设置(空)</h3>
       <table>
+        <colgroup>
+            <col style="width: 40%;">
+            <col style="width: 60%;">
+        </colgroup>
         <tr><td>参数名</td><td colspan="2">数值</td></tr>
         <tr><td>基准点差</td><td colspan="2"><input type="number" id="start_spread_SHORT"></td></tr>
         <tr><td>区间点差</td><td colspan="2"><input type="number" id="range_spread_SHORT"></td></tr>
         <tr><td>平仓点差</td><td colspan="2"><input type="number" id="close_spread_SHORT"></td></tr>
         <tr><td>最大持仓</td><td colspan="2"><input type="number" id="max_vol_SHORT"></td></tr>
+        <tr><td>手动单平仓</td><td colspan="2"> <button class="submit-btn" data-follow="1" id="is_close_by_strategy_SHORT" onclick="toggleFollow('SHORT',this)">不跟随</button></td></tr>
         <tr><td>策略状态</td><td colspan="2" id="is_run_SHORT"></td></tr>
       </table>
       <button onclick="submit_base_data('SHORT')">更新策略</button>
+      <button onclick="stop_strategy('SHORT')">停止策略</button>
+      <button onclick="start_strategy('SHORT')">启动策略</button>
     </section>
 
 
     <section class="config-section">
       <h3>比率配置</h3>
       <table>
+        <colgroup>
+            <col style="width: 20%;">
+            <col style="width: 30%;">
+            <col style="width: 15%;">
+            <col style="width: 35%;">
+        </colgroup>
         <tr><td>平台</td><td>标的</td><td>方向</td><td>数量</td></tr>
         <tr><td>期货</td><td id="ctp_symbol_SHORT"></td><td>空</td><td><input type="number" id="ctp_vol_SHORT"></td></tr>
         <tr><td>MT5</td><td id="mt5_symbol1_SHORT"></td><td>多</td><td><input type="number" id="mt5_vol1_SHORT"></td></tr>
         <tr><td>MT5</td><td id="mt5_symbol2_SHORT"></td><td>多</td><td><input type="number" id="mt5_vol2_SHORT"></td></tr>
       </table>
       <button onclick="submit_strategy_data('SHORT')">更新策略</button>
-    </section>
 
 
     <!-- 限制交易时间模块 -->
+    </section>
+
+    <section class="config-section">
+      <h3>权益</h3>
+      <table>
+        <tr><td colspan="2" >平台</td><td colspan="2">数值</td></tr>
+        <tr><td colspan="2" style="background: #F08080;">浮动盈亏</td><td style="background: #F08080;" id="diff_balance"></td></tr>
+        <tr><td colspan="2" style="background: #F08080;">总权益</td><td style="background: #F08080;" id="current_sum_balance"></td></tr>
+        <tr><td colspan="2">伦敦金净值</td><td id="current_xau_equity"></td></tr>
+        <tr><td colspan="2">汇率净值</td><td id="current_usd_equity"></td></tr>
+        <tr><td colspan="2">期货权益</td><td id="current_ctp_balance"></td></tr>
+        <tr><td colspan="2">初始资金</td><td id="total_cost"></td></tr>
+        <tr><td colspan="2">修改初始资金</td><td><input type="number" id="update_total_cost"></td></tr>
+      </table>
+      <button onclick="submit_update_total_cost()">更新初始资金</button>
+    </section>
     <section class="config-section">
       <h3>限制交易时间</h3>
       <table>
         <tr><td>类型</td><td>起始</td><td>截止</td></tr>
         <tr><td>日期</td><td><input type="date"  id="date_start_SHORT"></td><td><input type="date" id="date_stop_SHORT"></td></tr>
-        <tr><td>日期时间</td><td><input type="datetime-local" step="1" id="datetime_start_SHORT"></td><td><input type="datetime-local" step="1" id="datetime_stop_SHORT"></td></tr>
+        <tr><td>日期时间</td><td><input type="datetime-local" class="datetime-input" step="1" id="datetime_start_SHORT"></td><td><input type="datetime-local" class="datetime-input" step="1" id="datetime_stop_SHORT"></td></tr>
       </table>
       <button onclick="submit_time_data('SHORT')">提交修改</button>
-      <button onclick="stop_strategy('SHORT')">停止策略</button>
-      <button onclick="start_strategy('SHORT')">启动策略</button>
     </section>
-
     </div>
 </div>
 
 <script>
-    window.addEventListener('load', () => {
+  // 方案1：全局单例管理
+    let _socketInstance = null;
+    function get_market_spread() {
+      _socketInstance = io('/realtime');
+
+      _socketInstance.on('connect', () => {
+        // console.log('Socket connected');
+        _socketInstance.emit('request_data');
+      });
+
+      const handleUpdate = (data) => {
+        if (data && typeof data === 'object') {
+          Object.keys(data).forEach(key => {
+            const el = document.getElementById(key);
+            if (el) el.textContent = data[key];
+          });
+        }
+        // console.log('Received update:', data);
+      };
+
+      _socketInstance.on('update', handleUpdate);
+
+      const cleanUp = () => {
+        console.log('Cleaning up socket connection');
+        _socketInstance.off('update', handleUpdate);
+        _socketInstance.disconnect();
+        _socketInstance = null;
+      };
+
+      window.addEventListener('beforeunload', cleanUp);
+    }
+
+    function get_risk(){
+        fetch('/risk?action=get_risk')
+          .then(res => res.json())
+          .then(data => {
+            const keys = [
+              "spread_start",
+              "stop_spread",
+              "xau_margin_level",
+              "xau_margin_level_stop_trade",
+              "usd_margin_level",
+              "usd_margin_level_stop_trade",
+              "xau_equity",
+              "usd_equity",
+              "ctp_margin_free",
+              "ctp_margin_free_stop_trade",
+              "xua_price_start",
+              "xua_price_stop",
+              "usd_price_start",
+              "usd_price_stop",
+              "xau_volatility_time",
+              "xau_volatility_price"
+            ];
+            keys.forEach(key => {
+              const input = document.getElementById(key);
+              if (input) {
+                input.value = data[key] ?? ''; // 设置值，避免 null/undefined
+              }
+            });
+          })
+          .catch(err => {
+            console.error("获取设置失败:", err);
+          });
+    }
+    function initPageData(){
       // 定义参数
       const api1 = fetch('/strategy?action=strategy&longShort=LONG').then(res => res.json());
       const api2 = fetch('/strategy?action=strategy&longShort=SHORT').then(res => res.json());
       Promise.all([api1, api2])
               .then(([data1_json, data2_json]) => {
-                data1 = JSON.parse(data1_json);
-                data2 = JSON.parse(data2_json);
-                document.getElementById('start_spread_LONG').value = data1.base.startSpread;
-                document.getElementById('range_spread_LONG').value = data1.base.rangeSpread;
-                document.getElementById('close_spread_LONG').value = data1.base.closeSpread;
-                document.getElementById('max_vol_LONG').value = data1.base.maxVol;
-                console.log( data1.base.isRun)
+                longData = JSON.parse(data1_json);
+                shortData = JSON.parse(data2_json);
+                document.getElementById('start_spread_LONG').value = longData.base.startSpread;
+                document.getElementById('range_spread_LONG').value = longData.base.rangeSpread;
+                document.getElementById('close_spread_LONG').value = longData.base.closeSpread;
+                document.getElementById('max_vol_LONG').value = longData.base.maxVol;
                 const statusCell = document.getElementById(`is_run_LONG`);
-                statusCell.style.backgroundColor = data1.base.isRun ? 'green':'red';
+                statusCell.style.backgroundColor = longData.base.isRun ? 'green':'red';
+                statusCell.textContent = longData.base.isRun ? '策略已启动':'策略已关闭';
 
-                document.getElementById('ctp_symbol_LONG').textContent = data1.op1.symbol;
-                document.getElementById('mt5_symbol1_LONG').textContent = data1.op2.symbol;
-                document.getElementById('mt5_symbol2_LONG').textContent = data1.op3.symbol;
-                document.getElementById('ctp_vol_LONG').value = data1.op1.rate;
-                document.getElementById('mt5_vol1_LONG').value = data1.op2.rate;
-                document.getElementById('mt5_vol2_LONG').value = data1.op3.rate;
+                document.getElementById('ctp_symbol_LONG').textContent = longData.op1.symbol;
+                document.getElementById('mt5_symbol1_LONG').textContent = longData.op2.symbol;
+                document.getElementById('mt5_symbol2_LONG').textContent = longData.op3.symbol;
+                document.getElementById('ctp_vol_LONG').value = longData.op1.rate;
+                document.getElementById('mt5_vol1_LONG').value = longData.op2.rate;
+                document.getElementById('mt5_vol2_LONG').value = longData.op3.rate;
 
-                document.getElementById('date_start_LONG').value = data1.base.stopDate[0];
-                document.getElementById('date_stop_LONG').value = data1.base.stopDate[1];
-                document.getElementById('datetime_start_LONG').value = data1.base.stopDateTime[0];
-                document.getElementById('datetime_stop_LONG').value = data1.base.stopDateTime[1];
+                document.getElementById('date_start_LONG').value = longData.base.stopDate[0];
+                document.getElementById('date_stop_LONG').value = longData.base.stopDate[1];
+                document.getElementById('datetime_start_LONG').value = longData.base.stopDateTime[0];
+                document.getElementById('datetime_stop_LONG').value = longData.base.stopDateTime[1];
 
 
 
-                document.getElementById('start_spread_SHORT').value = data2.base.startSpread;
-                document.getElementById('range_spread_SHORT').value = data2.base.rangeSpread;
-                document.getElementById('close_spread_SHORT').value = data2.base.closeSpread;
-                document.getElementById('max_vol_SHORT').value = data2.base.maxVol;
+                document.getElementById('start_spread_SHORT').value = shortData.base.startSpread;
+                document.getElementById('range_spread_SHORT').value = shortData.base.rangeSpread;
+                document.getElementById('close_spread_SHORT').value = shortData.base.closeSpread;
+                document.getElementById('max_vol_SHORT').value = shortData.base.maxVol;
                 const statusCell2 = document.getElementById(`is_run_SHORT`);
-                statusCell2.style.backgroundColor = data2.base.isRun ? 'green':'red';
+                statusCell2.style.backgroundColor = shortData.base.isRun ? 'green':'red';
+                statusCell2.textContent = shortData.base.isRun ? '策略已启动':'策略已关闭';
 
-                document.getElementById('ctp_symbol_SHORT').textContent = data2.op1.symbol;
-                document.getElementById('mt5_symbol1_SHORT').textContent = data2.op2.symbol;
-                document.getElementById('mt5_symbol2_SHORT').textContent = data2.op3.symbol;
-                document.getElementById('ctp_vol_SHORT').value = data2.op1.rate;
-                document.getElementById('mt5_vol1_SHORT').value = data2.op2.rate;
-                document.getElementById('mt5_vol2_SHORT').value = data2.op3.rate;
+                document.getElementById('ctp_symbol_SHORT').textContent = shortData.op1.symbol;
+                document.getElementById('mt5_symbol1_SHORT').textContent = shortData.op2.symbol;
+                document.getElementById('mt5_symbol2_SHORT').textContent = shortData.op3.symbol;
+                document.getElementById('ctp_vol_SHORT').value = shortData.op1.rate;
+                document.getElementById('mt5_vol1_SHORT').value = shortData.op2.rate;
+                document.getElementById('mt5_vol2_SHORT').value = shortData.op3.rate;
 
-                document.getElementById('date_start_SHORT').value = data2.base.stopDate[0];
-                document.getElementById('date_stop_SHORT').value = data2.base.stopDate[1];
-                document.getElementById('datetime_start_SHORT').value = data2.base.stopDateTime[0];
-                document.getElementById('datetime_stop_SHORT').value = data2.base.stopDateTime[1];
+                document.getElementById('date_start_SHORT').value = shortData.base.stopDate[0];
+                document.getElementById('date_stop_SHORT').value = shortData.base.stopDate[1];
+                document.getElementById('datetime_start_SHORT').value = shortData.base.stopDateTime[0];
+                document.getElementById('datetime_stop_SHORT').value = shortData.base.stopDateTime[1];
               })
               .catch(error => {
                 console.error('请求失败:', error);
               });
-    })
-
-
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+      get_market_spread();
+      initPageData();
+      get_risk()
+    });
     // 修改基础策略
     async function submit_base_data(longshort){
         const userData = {
@@ -287,6 +578,7 @@
           }
     }
 
+    //停止策略
     async function stop_strategy(longshort){
           const userData = {
               long_short:longshort,
@@ -303,15 +595,16 @@
               const result = await response.json();
               alert(result.message);
             if (result.status){
-                const statusCell = document.getElementById(`is_run_${longshort}`);
-                statusCell.style.backgroundColor = 'red';
+                stop_strategy_after_clear_positions(longshort)
               }
           } catch (error) {
               console.error('提交数据失败:', error);
           }
     }
 
+    //开始策略
     async function start_strategy(longshort){
+      if (!window.confirm(`当前策略是已更新过?`)) return;
           const userData = {
               long_short:longshort,
           };
@@ -329,16 +622,378 @@
               if (result.status){
                 const statusCell = document.getElementById(`is_run_${longshort}`);
                 statusCell.style.backgroundColor = 'green';
+                statusCell.textContent = '策略已启动';
               }
           } catch (error) {
               console.error('提交数据失败:', error);
           }
     }
-    async function close_positions(longshort){
+
+
+    async function qry_orders(status){
 
         try {
-            const response = await fetch(`/strategy?action=close_positions&longShort=${longshort}`, {
+            const response = await fetch(`/parent_orders?action=qry_orders&status=${status}`, {
+                method: 'GET',
+            });
+            const result = await response.json();
+            // 渲染表格核心逻辑
+            const thead = document.querySelector('#orderTable thead');
+            thead.innerHTML = ''; // 清空旧数据
+            thead.innerHTML= `
+                      <tr>
+                      <th><input type="checkbox" id="selectAll"></th>
+                      <th>委托号</th>
+                      <th>多空</th>
+                      <th>预期点差</th>
+                      <th>实际开点差</th>
+                      <th>预期平点差</th>
+                      <th>实际平点差</th>
+                      <th>状态</th>
+                      <th style="white-space: normal; word-break: break-word; width: 100px;">创建时间</th>
+                      <th style="white-space: normal; word-break: break-word; width: 100px;">平仓时间</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">ctp委托量</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">mt5_1委托量</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">mt5_2委托量</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">是手动点差</th>
+                      <th style="white-space: normal; word-break: break-word; width: 30px;">手动平仓点差</th>
+                      <th colspan="2" style="width: 100px;">平仓值操作</th>
+                    </tr>
+            `;
+            const tbody = document.querySelector('#orderTable tbody');
+            tbody.innerHTML = ''; // 清空旧数据
+
+            result.data.forEach(order => {
+                const tr = document.createElement('tr');
+                if (order.fixed_close_spread === 1) {
+                  tr.style.backgroundColor = '#fff8dc';  // cornsilk 柔和黄色
+                }
+                // 复选框列 + 12个数据列
+                let createdTime = order.created_at?.split('T')[1] || '';
+                let closedTime = order.closed_at?.split('T')[1] || '';
+                if (order.is_manual === true) {
+                  tr.style.backgroundColor = '#fff8dc'; // cornsilk 柔和黄色，也可用 '#ffffcc' 更亮的黄
+                }
+                tr.innerHTML = `
+                    <td><input type="checkbox"  class="order-check" data-entrustno="${order.entrustNo}"></td>
+                    <td data-key="entrustNo">${order.entrustNo}</td>
+                    <td>${order.longShort}</td>
+                    <td>${order.spread}</td>
+                    <td>${order.realOpenSpread || ''}</td>
+                    <td>${order.closeSpread || ''}</td>
+                    <td>${order.realCloseSpread || ''}</td>
+                    <td>${order.status}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 100px;">${createdTime}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 100px;">${closedTime}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.askCtpQty}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.askMt51Qty}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.askMt52Qty}</td>
+                    <td data-key="is_fixed_close_spread" style="white-space: normal; word-break: break-word; width: 60px;">${order.fixedCloseSpread}</td>
+                    <td data-key="fixed_close_spread" style="white-space: normal; word-break: break-word; width: 30px;"><input type="number" style="width: 60px;" ></td>
+                    <td><button onclick="update_close_spread_type(1, this)" class="submit-btn" style="width: 60px; padding: 2px 2px; font-size: 12px;">手动点差</button></td>
+                    <td><button onclick="update_close_spread_type(0, this)" class="submit-btn" style="width: 60px; padding: 2px 2px; font-size: 12px;">策略点差</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            console.error('查询失败:', error);
+        }
+    }
+    async function qry_error_orders(){
+
+        try {
+            const response = await fetch(`/parent_orders?action=qry_error_order`, {
+                method: 'GET',
+            });
+            const result = await response.json();
+            // 渲染表格核心逻辑
+            const thead = document.querySelector('#orderTable thead');
+            thead.innerHTML = ''; // 清空旧数据
+            thead.innerHTML= `
+                      <tr>
+                      <th><input type="checkbox" id="selectAll"></th>
+                      <th>委托号</th>
+                      <th>多空</th>
+                      <th>预期点差</th>
+                      <th>实际开点差</th>
+                      <th>预期平点差</th>
+                      <th style="white-space: normal; word-break: break-word; width: 100px;">创建时间</th>
+                      <th style="white-space: normal; word-break: break-word; width: 100px;">平仓时间</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">ctp持仓</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">xau持仓</th>
+                      <th style="white-space: normal; word-break: break-word; width: 60px;">usd持仓</th>
+                      <th colspan="2" style="width: 100px">异常处理</th>
+                    </tr>
+            `;
+            const tbody = document.querySelector('#orderTable tbody');
+            tbody.innerHTML = ''; // 清空旧数据
+
+            result.data.forEach(order => {
+                const tr = document.createElement('tr');
+                // 复选框列 + 12个数据列
+                let createdTime = order.created_at?.split('T')[1] || '';
+                let closedTime = order.closed_at?.split('T')[1] || '';
+                tr.innerHTML = `
+                    <td><input type="checkbox"  class="order-check" data-entrustno="${order.entrustNo}"></td>
+                    <td data-key="entrustNo">${order.entrustNo}</td>
+                    <td>${order.long_short}</td>
+                    <td>${order.spread}</td>
+                    <td>${order.realOpenSpread || ''}</td>
+                    <td>${order.closeSpread || ''}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 100px;">${createdTime}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 100px;">${closedTime}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.ctpQty}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.xauQty}</td>
+                    <td style="white-space: normal; word-break: break-word; width: 60px;">${order.usdQty}</td>
+                    <td><button onclick="deal_error_orders('CLOSE',this)" class="submit-btn" style="width: 95%; height: 95%;">平多</button></td>
+                    <td><button onclick="deal_error_orders('ADD',this)" class="submit-btn" style="width: 95%; height: 95%;">补缺</button></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        } catch (error) {
+            console.error('查询失败:', error);
+        }
+    }
+    // async function exc_error_orders() {
+    //   const checkedRows = document.querySelectorAll('.error-order-check:checked');
+    //   const selectedOrders = [];
+    //   checkedRows.forEach(checkbox => {
+    //   const row = checkbox.closest('tr');
+    //   const cells = row.querySelectorAll('td[data-key]');
+    //
+    //   const order = {};
+    //   cells.forEach(cell => {
+    //     const key = cell.getAttribute('data-key');
+    //     let value = cell.textContent.trim();
+    //     if (['vol','entrustNo'].includes(key)) {
+    //       value = parseFloat(value);
+    //     }
+    //     order[key] = value;
+    //   });
+    //
+    //   selectedOrders.push(order);
+    //   });
+    //
+    //   if (selectedOrders.length === 0) {
+    //     alert('请先选择要平仓的委托');
+    //     return;
+    //   }
+    //
+    //   // 弹窗确认逻辑
+    //   if (!window.confirm(`请与 客户端订单进行核对,缺失委托是否一致 ,继续？`)) return;
+    //   try {
+    //       const response = await fetch('/parent_orders?action=exc_error_orders', {
+    //           method: 'POST',
+    //           headers: {
+    //               'Content-Type': 'application/json'
+    //           },
+    //           body: JSON.stringify(selectedOrders)
+    //
+    //       });
+    //       const result = await response.json();
+    //       alert(result.message);
+    //       if (result.status){
+    //         // 获取当前展示的状态参数（假设通过全局变量存储）
+    //         qry_error_orders(0); // 触发重新查询渲染
+    //       }
+    //   } catch (error) {
+    //       console.error('提交数据失败:', error);
+    //   }
+    //
+    // }
+    // 全选控制
+    // document.getElementById('selectAll').addEventListener('click', (e) => {
+    //   document.querySelectorAll('.order-check').forEach(checkbox => {
+    //     checkbox.checked = e.target.checked;
+    //   });
+    // });
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'selectAll') {
+        const checked = e.target.checked;
+        document.querySelectorAll('.order-check').forEach(cb => cb.checked = checked);
+      }
+    });
+
+    //删除历史委托
+    // async function delete_history_orders(){
+    //   selected = Array.from(document.querySelectorAll('.order-check:checked')).map(checkbox => Number(checkbox.dataset.entrustno));
+    //   const selectedCheckboxes = Array.from(document.querySelectorAll('.order-check:checked'));
+    //   if (selected.length === 0) {
+    //     alert('请先选择要删除的委托');
+    //     return;
+    //   }
+    //
+    //   for (const checkbox of selectedCheckboxes) {
+    //     const row = checkbox.closest('tr');
+    //     const status = parseInt(row.querySelector('td:nth-child(6)').textContent); // 状态在第8列
+    //     if (status < 9) {
+    //         alert(`委托号 ${checkbox.dataset.entrustno} 状态${status} 未平仓,不可删除`);
+    //         return;
+    //     }
+    //   }
+    //
+    //   // 弹窗确认逻辑
+    //   if (!window.confirm(`将删除${selected.length}条记录，不可恢复！继续？`)) return;
+    //   try {
+    //       const response = await fetch('/parent_orders?action=delete_history_orders', {
+    //           method: 'POST',
+    //           headers: {
+    //               'Content-Type': 'application/json'
+    //           },
+    //           body: JSON.stringify(selected)
+    //
+    //       });
+    //       const result = await response.json();
+    //       alert(result.message);
+    //       if (result.status){
+    //         // 获取当前展示的状态参数（假设通过全局变量存储）
+    //         qry_orders(1); // 触发重新查询渲染
+    //       }
+    //   } catch (error) {
+    //       console.error('提交数据失败:', error);
+    //   }
+    // }
+
+    // 更新委托为"已平" (修改内存+数据库+CTP内存)
+    // 修改 已平没意义
+    //场景: 手动在 期货客户端平了,程序实际找不到委托
+    // async function update_orders(){
+    //   const selected = Array.from(document.querySelectorAll('.order-check:checked')).map(checkbox => Number(checkbox.dataset.entrustno));
+    //   // const selectedCheckboxes = Array.from(document.querySelectorAll('.order-check:checked'));
+    //   if (selected.length === 0) {
+    //     alert('请先选择要修改的委托');
+    //     return;
+    //   }
+    //
+    //   // 弹窗确认逻辑
+    //   if (!window.confirm(`将更新${selected.length}条记录为平仓状态,\n 1 确认手动平期货端\n 2 确认2个MT5平仓完成\n 继续？`)) return;
+    //   try {
+    //       const response = await fetch('/parent_orders?action=update_orders', {
+    //           method: 'POST',
+    //           headers: {
+    //               'Content-Type': 'application/json'
+    //           },
+    //           body: JSON.stringify(selected)
+    //
+    //       });
+    //       const result = await response.json();
+    //       alert(result.message);
+    //       if (result.status){
+    //         // 获取当前展示的状态参数（假设通过全局变量存储）
+    //         qry_orders(0); // 触发重新查询渲染
+    //       }
+    //   } catch (error) {
+    //       console.error('提交数据失败:', error);
+    //   }
+    // }
+    async function close_orders(){
+      selected = Array.from(document.querySelectorAll('.order-check:checked')).map(checkbox => Number(checkbox.dataset.entrustno));
+      let selectedCheckboxes = Array.from(document.querySelectorAll('.order-check:checked'));
+      if (selected.length === 0) {
+        alert('请先选择要平仓的委托');
+        return;
+      }
+
+      // 弹窗确认逻辑
+      // if (!window.confirm(`将平${selected.length}条仓，不可恢复！继续？`)) return;
+      try {
+          const response = await fetch('/parent_orders?action=close_orders', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(selected)
+
+          });
+          const result = await response.json();
+          // alert(result.message);
+          if (result.status){
+            // 获取当前展示的状态参数（假设通过全局变量存储）
+            qry_orders(0); // 触发重新查询渲染
+          }else {
+            alert(result.message)
+            qry_orders(0)
+          }
+      } catch (error) {
+          console.error('提交数据失败:', error);
+      }
+    }
+
+    function stop_strategy_after_clear_positions(longshort){
+        const type = longshort === 'LONG' ? 'LONG' : 'SHORT'; // 参数过滤
+        const statusCell = document.getElementById(`is_run_${type}`); // 正确使用模板字符串
+        if (statusCell) { // 空值保护
+          statusCell.style.backgroundColor = 'red';
+          statusCell.textContent = '策略已关闭';
+    }
+}
+    // 清仓
+    async function clear_positions(longshort){
+        if (!window.confirm(`将清${longshort}仓，不可恢复！建议先关闭策略,继续？`)) return;
+        try {
+            const response = await fetch(`/parent_orders?action=clear_positions&longShort=${longshort}`, {
                 method: 'POST',
+                headers: {'Content-Type': 'application/json'}, // 明确声明内容类型
+                body: "null" // 显式空请求体
+            });
+            const result = await response.json()
+            if (result.status===false){
+            alert(result.message);
+            }
+              qry_orders(0); // 触发重新查询渲染
+              stop_strategy_after_clear_positions(longshort)
+        } catch (error) {
+            console.error('提交数据失败:', error);
+        }
+    }
+
+    async function clear_all_data(){
+      if (!window.confirm(`将清理所有数据，不可恢复！建议先 "关闭策略" 然后 "清掉各个客户端的所有仓位",继续？点取消则返回`)) return;
+        try {
+            const response = await fetch(`/parent_orders?action=clear_all_data`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}, // 明确声明内容类型
+                body: "null" // 显式空请求体
+            });
+            const result = await response.json();
+            alert(result.message);
+            if (result.status){
+              // 获取当前展示的状态参数（假设通过全局变量存储）
+              qry_orders(0); // 触发重新查询渲染
+              stop_strategy_after_clear_positions("LONG")
+              stop_strategy_after_clear_positions("SHORT")
+              }
+        } catch (error) {
+            console.error('提交数据失败:', error);
+        }
+    }
+
+    async function submit_risk_data(){
+        const userData = {
+            spread_start:parseFloat(document.getElementById(`spread_start`).value),
+            stop_spread:parseFloat(document.getElementById(`stop_spread`).value),
+            xau_margin_level:parseFloat(document.getElementById(`xau_margin_level`).value),
+            xau_margin_level_stop_trade:parseFloat(document.getElementById(`xau_margin_level_stop_trade`).value),
+            usd_margin_level:parseFloat(document.getElementById(`usd_margin_level`).value),
+            usd_margin_level_stop_trade:parseFloat(document.getElementById(`usd_margin_level_stop_trade`).value),
+            xau_equity:parseFloat(document.getElementById(`xau_equity`).value),
+            usd_equity:parseFloat(document.getElementById(`usd_equity`).value),
+            ctp_margin_free:parseFloat(document.getElementById(`ctp_margin_free`).value),
+            xua_price_start:parseFloat(document.getElementById(`xua_price_start`).value),
+            xua_price_stop:parseFloat(document.getElementById(`xua_price_stop`).value),
+            usd_price_start:parseFloat(document.getElementById(`usd_price_start`).value),
+            usd_price_stop:parseFloat(document.getElementById(`usd_price_stop`).value),
+            xau_volatility_time:parseFloat(document.getElementById(`xau_volatility_time`).value),
+            xau_volatility_price:parseFloat(document.getElementById(`xau_volatility_price`).value),
+            ctp_margin_free_stop_trade:parseFloat(document.getElementById(`ctp_margin_free_stop_trade`).value),
+        };
+        try {
+            const response = await fetch('/risk?action=update_risk', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
             });
             const result = await response.json();
             alert(result.message);
@@ -346,9 +1001,150 @@
             console.error('提交数据失败:', error);
         }
     }
+    async function open_order(longshort){
+      // if (!window.confirm(`确定开仓?`)) return;
+      const el = document.getElementById(longshort === 'LONG' ? 'long_spread' : 'short_spread');
+      const spread = el && el.textContent.trim() ? parseFloat(el.textContent.trim()) : 0;
+      // const spread= longshort === 'LONG' ? parseFloat(document.getElementById(`long_spread`).textContent) : parseFloat(document.getElementById(`short_spread`).textContent)
 
+      const userData = {
+        long_short:longshort,
+        open_spread:spread,
+      };
+      try {
+            const response = await fetch(`/parent_orders?action=open_order`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            });
+            const result = await response.json();
+            // alert(result.message);
+        if (result.status){
+                qry_orders(0)
+              }else {
+          alert(result.message)
+              }
+        } catch (error) {
+            console.error('提交数据失败:', error);
+        }
+    }
+    async function update_close_spread_type(type, btn){
+      const tr = btn.closest('tr'); // 找到当前按钮所在的行
+      const tds = tr.querySelectorAll('td');
+      let input = tr.querySelector('td[data-key="fixed_close_spread"] input');
+      const data = {
+        entrustNo: parseInt(tds[1].textContent.trim()),
+        fixedCloseSpread: parseFloat(input?.value || 0),
+        updateType: type
+      };
+      let close_spread_type = type ===1 ? "手动平仓点差" : "自动平仓点差"
+      // 弹窗确认逻辑
+      if (!window.confirm(`修改委托 ${data.entrustNo} 为${close_spread_type} 点差为${data.fixedCloseSpread},继续？`)) return;
+      try {
+          const response = await fetch('/parent_orders?action=update_close_spread_type', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(data)
+          });
+          const result = await response.json();
+          alert(result.message);
+          if (result.status){
+            // 获取当前展示的状态参数（假设通过全局变量存储）
+            qry_orders(0); // 触发重新查询渲染
+          }
+      } catch (error) {
+          console.error('提交数据失败:', error);
+      }
+    }
+    async function deal_error_orders(action,row){
+      const tr = row.closest('tr'); // 找到当前按钮所在的行
+      const tds = tr.querySelectorAll('td');
 
+      const data = {
+        entrustNo: parseInt(tds[1].textContent.trim()),
+        deal_type: action
+      };
+      let id=data.entrustNo
+      // 弹窗确认逻辑
+      if (!window.confirm(`处理委托委托 ${id} 方式为 ${action},继续？`)) return;
+      try {
+          const response = await fetch('/parent_orders?action=deal_error_orders', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(data)
 
+          });
+          const result = await response.json();
+          if (result.status === false){
+            alert(result.message);
+          }
+           qry_error_orders(); // 触发重新查询渲染
+      } catch (error) {
+          console.error('提交数据失败:', error);
+      }
+    }
+    // 修改手动订单是否跟随策略平仓
+    async function toggleFollow(longShort,button) {
+      const isFollow = button.getAttribute('data-follow') === '1';
+      const newFollowValue = isFollow ? 0 : 1;
+      try {
+            const response = await fetch('/strategy?action=update_is_manual_close_flow_strategy', {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json'
+              },
+                body: JSON.stringify({
+                      follow: newFollowValue,
+                      longShort:longShort,
+                    })
+          });
+          const result = await response.json();
+          if (result.status){
+            button.setAttribute('data-follow', newFollowValue);
+            button.textContent = newFollowValue === 1 ? '跟随策略' : '不跟随';
+          }
+      } catch (error) {
+          console.error('提交数据失败:', error);
+      }
+  }
+    async function submit_update_total_cost(){
+          const userData = {
+              total_cost: parseFloat(document.getElementById(`update_total_cost`).value),
+          };
+          try {
+              const response = await fetch('/strategy?action=update_total_cost', {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify(userData)
+              });
+              const result = await response.json();
+          } catch (error) {
+              console.error('提交数据失败:', error);
+          }
+    }
+    async function reconnect_mt5(symbol){
+      if (!window.confirm(`重新链接MT5,继续？`)) return;
+      try {
+              const response = await fetch(`/strategy?action=reconnect_mt5&mt5=${symbol}`, {
+                  method: 'POST',
+                  headers: {
+                      'Content-Type': 'application/json'
+                  },
+                  body: null
+              });
+              const result = await response.json();
+          } catch (error) {
+              console.error('重连失败:', error);
+          }
+    }
 </script>
 </body>
 </html>

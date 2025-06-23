@@ -1,0 +1,18 @@
+{
+  "db": {
+      "host":"rm-bp1l09swp665a10naro.mysql.rds.aliyuncs.com",
+      "user":"test_quant",
+      "pwd":"_6PieP5cHqcfvpa",
+      "charset":"utf8",
+      "db":"quant",
+      "table":"accountinfo"
+  },
+  "interval_seconds": 10,
+  "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c360c9b1-88fb-4f1d-bdcb-bff05e9120ac",
+  "monitor":[
+      {"account":"235096","margin_level_is_low":500.0 ,"equity_is_low": 10000000.0,"margin_free_is_low":2000000.0 ,"audio_path": "C:\\Windows\\Media\\Alarm01.wav"},
+      {"account":"52280146","margin_level_is_low":500.0 ,"equity_is_low": 10000000.0,"margin_free_is_low":2000.0 ,"audio_path": "C:\\Windows\\Media\\Alarm01.wav"},
+      {"account":"52280144","margin_level_is_low":198598.7 ,"equity_is_low": 1000000.0,"margin_free_is_low":2000.0 ,"audio_path": "C:\\Windows\\Media\\Alarm01.wav"}
+
+    ]
+}

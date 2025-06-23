@@ -28,21 +28,28 @@ class Mt5Api:
         self.broker_host = broker_host
         self.order_type_filling = order_type_filling
 
+    def is_mt5_connected(self):
+        term_info = mt5.terminal_info()
+        acc_info = mt5.account_info()
+        return term_info is not None and acc_info is not None
     def run(self):
-        if not mt5.initialize(path=self.path):
-            log.error("mt5initialize() failed, error code ={}".format(mt5.last_error()))
-            sys.exit(-1)
-        else:
-            log.info("mt5 init success!!!")
+        if not self.is_mt5_connected():
+            mt5.shutdown()
+            time.sleep(1)
+            if not mt5.initialize(path=self.path):
+                log.error("mt5initialize() failed, error code ={}".format(mt5.last_error()))
+                sys.exit(-1)
+            else:
+                log.info("mt5 init success!!!")
 
-        authorized = mt5.login(self.account, password=self.pwd, server=self.broker_host)
-        if authorized:
-            account_info = mt5.account_info()
-            if account_info != None:
-                log.info("mt5 login  success #{}".format(account_info))
-        else:
-            log.error("failed to connect at account #{}, error code: {}".format(self.account, mt5.last_error()))
-            sys.exit(-1)
+            authorized = mt5.login(self.account, password=self.pwd, server=self.broker_host)
+            if authorized:
+                account_info = mt5.account_info()
+                if account_info != None:
+                    log.info("mt5 login  success #{}".format(account_info))
+            else:
+                log.error("failed to connect at account #{}, error code: {}".format(self.account, mt5.last_error()))
+                sys.exit(-1)
 
     def get_tick_price_from_symbol(self, symbol):
         # 获取行情 外汇 几秒更新/ 伦敦金1秒更新
@@ -59,7 +66,7 @@ class Mt5Api:
         if symbol_info == None:
             log.warning("mt5 symbol_info_tick fail,{} ,error:{} ".format(symbol, mt5.last_error()))
             return None
-        log.debug("mt5 md [{}] ask:{},bid:{}".format(symbol, symbol_info.ask, symbol_info.bid))
+        # log.debug("mt5 md [{}] ask:{},bid:{}".format(symbol, symbol_info.ask, symbol_info.bid))
         md = comm.RtnRsp()
         md.req_success = True
         market = models.Market()
@@ -74,7 +81,7 @@ class Mt5Api:
         r = {
             "action": action,  # 写死市价即可
             "symbol": symbol,
-            "volume": lot,
+            "volume": float(lot),
             "type": side,
             "magic": magic,  # EA ID  用作 mt5 每次执行的策略号
             "comment": comment,
@@ -102,7 +109,9 @@ class Mt5Api:
         # request=TradeRequest(action=1, magic=1, order=0, symbol='XAUUSDm', volume=0.01, price=0.0, stoplimit=0.0, sl=0.0, tp=0.0, deviation=0, type=0, type_filling=0, type_time=0, expiration=0, comment='1', position=0, position_by=0))
 
     def reCloseOrder(self, order):
-        position = self.getPositionID(order.pEntrustNo, order.symbol, order.longShort)
+        position = self.getPositionID(order.orderRef, order.symbol, order.longShort)
+        if position is None:
+            return None
         result = self.sendOrder(comm.ACTION, order.symbol, order.askQty, comm.getSide(order.longShort, comm.TRADE_TYPE_CLOSE), order.pEntrustNo, str(order.entrustNo), self.order_type_filling, position.ticket)
         return result
 
@@ -139,6 +148,7 @@ class Mt5Api:
                 order.status = comm.ORDER_STATUS_REJECTED
                 order.statusMsg = "sendOrder fail,code {}".format(mt5.last_error())
         if result is not None:
+            order.orderRef = result.request.comment
             log.info(f"mt5 get entrustNo:{order.entrustNo},pId:{order.pEntrustNo} trade result {result}")
             if result.retcode == mt5.TRADE_RETCODE_DONE:
                 order.status = comm.ORDER_STATUS_AllTrade
@@ -169,11 +179,16 @@ class Mt5Api:
                 order.bidVol = result.volume
                 order.bidPrice = result.price
                 RtnRsp.req_success = True
+            elif result.retcode == mt5.TRADE_RETCODE_CONNECTION:
+                RtnRsp.req_success = False
+                order.status = comm.ORDER_STATUS_NOT_CONNECTED
+                order.statusMsg = "拒单,code {}".format(utils.discribe_error_code(result.retcode))
+                RtnRsp.errmsg = order.statusMsg
             else:
                 order.status = comm.ORDER_STATUS_REJECTED
-                order.statusMsg = "拒单,code {}".format(result.retcode)
+                order.statusMsg = "拒单,code {}".format(utils.discribe_error_code(result.retcode))
                 RtnRsp.req_success = False
-            order.orderSysID = result.order
+            order.orderSysID = str(result.order)
 
         order.rspTime = datetime.now()
         RtnRsp.order = order
@@ -255,11 +270,11 @@ class Mt5Api:
         elif len(positions) > 0:
             return positions
 
-    def getPositionID(self, magic, symbol, longShort):
+    def getPositionID(self, comment, symbol, longShort):
         side = mt5.ORDER_TYPE_BUY if longShort == comm.ACTION_LONG else mt5.ORDER_TYPE_SELL
         positions = self.getPostions()
         for position in positions:
-            if position.magic == magic and position.symbol == symbol and position.type == side:
+            if position.comment == comment and position.symbol == symbol and position.type == side:
                 return position
 
     def getPositionsFromSymbol(self, symbol, longShort):
@@ -278,8 +293,19 @@ class Mt5Api:
             return False, mt5.last_error(), None
         return True, "", rtn
 
+    def get_history_orders_from_time(self,from_t,to_t,symbol):
+        rt = mt5.history_orders_get(from_t, to_t, group=symbol)
+        if rt is None:
+            return False,mt5.last_error()
+        else:
+            return True,rt
+    def QryAccount(self):
+        account_info = mt5.account_info()
+        if account_info == None:
+            return False,None,mt5.last_error()
+        return True,account_info,""
 
-def getOrders(symbol):
+    def getOrders(slef,symbol):
     # 只返回 没终态的委托 数组 for order in orders:
     # (TradeOrder(
     # ticket=344970050,
@@ -306,4 +332,4 @@ def getOrders(symbol):
     # external_id=''),
     # TradeOrder(ticket=344970234, time_setup=1735182601, time_setup_msc=1735182601886, time_done=0, time_done_msc=0, time_expiration=0, type=2, type_time=0, type_filling=2, state=1, magic=0, position_id=0, position_by_id=0, reason=0, volume_initial=0.1, volume_current=0.1, price_open=2627.0, sl=0.0, tp=0.0, price_current=2628.321, price_stoplimit=0.0, symbol='XAUUSDm', comment='', external_id=''))
     # 返回的是元组 tuple
-    orders = mt5.orders_get(symbol=symbol)
+        orders = mt5.orders_get(symbol=symbol)

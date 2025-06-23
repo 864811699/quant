@@ -9,6 +9,7 @@ if __name__ == '__main__':
     import os
     import sys
 
+
     pwd = os.path.dirname(os.path.realpath(__file__))
     sys.path.insert(0, pwd + '/../')
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src/ctp/')))

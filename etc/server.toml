@@ -9,10 +9,13 @@
 	mt5USDCNHReqAddr="tcp://127.0.0.1:30003"
 	mt5XAUUSDReqAddr="tcp://127.0.0.1:30002"
     topic="market"
-    timeout= 4 # 秒
+    timeout= 10 # 秒
+    accountServerAdrrProxy= "tcp://127.0.0.1:30004"
+    accountServerAdrr="tcp://127.0.0.1:30005"
+    accountTopic="account"
 
 [notifyConfig]
-    url=""                  # 企业微信机器人地址
+    url="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=c360c9b1-88fb-4f1d-bdcb-bff05e9120ac"                  # 企业微信机器人地址
     successAudio="C:\\Windows\\Media\\Alarm01.wav"         # 成功铃音地址
     failAudio = "C:\\Windows\\Media\\Alarm01.wav"          # 失败铃音地址
     mentioned_list=""       # 企业微信@人
@@ -20,7 +23,7 @@
 [db]
     host="rm-bp1l09swp665a10naro.mysql.rds.aliyuncs.com"
     user="test_quant"
-    pwd="ASDzxc!%40#"  # 实际为ASDzxc!@#
+    pwd="_6PieP5cHqcfvpa"  # 实际为ASDzxc!@#
     charset="utf8"
 	db="quant"
 	table="parent"
