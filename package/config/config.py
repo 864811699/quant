@@ -1,6 +1,7 @@
 # coding=UTF-8
 
-import toml
+import tomli
+import tomli_w
 from threading import Lock
 
 
@@ -14,8 +15,8 @@ class Config(object):
         self.strategyConfig = {}
 
     def load_config(self):
-        with open(self.baseConfigFile, 'r',encoding='utf-8') as file:
-            self.cfg = toml.load(file)
+        with open(self.baseConfigFile, 'rb') as file:
+            self.cfg = tomli.load(file)
 
     def get_web_config(self):
         return self.cfg['webConfig']
@@ -37,14 +38,14 @@ class Config(object):
             return self.strategyConfig
 
     def read_strategy(self):
-        with open(self.strategyFile, 'r',encoding='utf-8') as file:
-            cfg = toml.load(file)
+        with open(self.strategyFile, 'rb') as file:
+            cfg = tomli.load(file)
             self.strategyConfig = cfg
 
     def write_strategy(self, strategy={}):
-        with open(self.strategyFile, 'w') as file:
-            with self.lock:
-                toml.dump(strategy, file)
+        with self.lock:
+            with open(self.strategyFile, 'wb') as file:
+                tomli_w.dump(strategy, file)
 
 # webConfig = {
 #     "host": "127.0.0.1",

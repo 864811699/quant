@@ -39,7 +39,8 @@ pyinstaller --clean --onefile ^
   --exclude-module PIL ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
-  --hidden-import=toml ^
+  --hidden-import=tomli ^
+  --hidden-import=tomli_w ^
   --hidden-import=thostmduserapi ^
   --hidden-import=thosttraderapi ^
   --hidden-import=openctp_ctp ^

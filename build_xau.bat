@@ -33,7 +33,8 @@ pyinstaller --clean --onefile ^
   --exclude-module __pycache__ ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
-  --hidden-import=toml ^
+  --hidden-import=tomli ^
+  --hidden-import=tomli_w ^
   --hidden-import=dataclasses ^
   --hidden-import=multiprocessing ^
   --hidden-import=json ^

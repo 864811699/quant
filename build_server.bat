@@ -36,7 +36,8 @@ pyinstaller --clean --onefile ^
   --exclude-module eventlet ^
   --hidden-import=logging ^
   --hidden-import=logging.handlers ^
-  --hidden-import=toml ^
+  --hidden-import=tomli ^
+  --hidden-import=tomli_w ^
   --hidden-import=threading ^
   --hidden-import=ctypes ^
   --hidden-import=dataclasses ^

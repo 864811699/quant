@@ -36,7 +36,7 @@ def restart_edge(url="http://127.0.0.1:30000"):
     if os.path.exists(edge_path):
         subprocess.Popen([edge_path, url])
     else:
-        print("❌ 找不到 Edge 浏览器路径，请确认是否安装 Edge")
+        print("找不到 Edge 浏览器路径，请确认是否安装 Edge")
 
 
 
